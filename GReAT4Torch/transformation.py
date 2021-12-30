@@ -1,6 +1,5 @@
 import torch
 from torch.nn.parameter import Parameter
-import torch.nn.functional as F
 import numpy as np
 from . import utils
 

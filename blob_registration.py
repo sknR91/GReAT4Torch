@@ -40,7 +40,7 @@ def main():
     h = torch.ones(1, dim)
     ####################################################################################################################
 
-    registration = grt.GroupwiseRegistrationMultilevel(min_level=4, max_level=5, dtype=dtype, device=device)
+    registration = grt.GroupwiseRegistrationMultilevel(min_level=9, max_level=9, dtype=dtype, device=device)
     transformation = grt.NonParametricTransformation(m, num_imgs, dtype=dtype, device=device)
     registration.set_transformation_type(transformation)
 

@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from mpl_toolkits.mplot3d import Axes3D
-import mpl_toolkits.mplot3d.axes3d as p3
 import numpy as np
 from . import utils
 
