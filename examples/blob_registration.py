@@ -28,7 +28,7 @@ def main():
     ####################################################################################################################
 
     ######## create circle data using numpy based GReAT-tools ############################################################
-    A = grt.compute_circle(np.array([400, 400]), 100, np.array([200, 200]))
+    A = grt.compute_circle(np.array([400, 400]), 10, np.array([200, 200]))
     B = grt.compute_circle(np.array([400, 400]), 100, np.array([250, 220]))
     C = grt.compute_circle(np.array([400, 400]), 100, np.array([170, 200]))
 
@@ -57,7 +57,7 @@ def main():
 
     optimizer = torch.optim.Adam(transformation.parameters(), lr=0.2)
     registration.set_optimizer(optimizer)
-    registration.set_max_iterations(555)
+    registration.set_max_iterations(55)
 
     ####################################
     registration.start()
@@ -70,11 +70,12 @@ def main():
 
     print(f"Registration done in {end-start} seconds.")
 
+    pplt = grt.plot()
     Ic_numpy = grt.image_list2numpy(Ic)
     Ic_warped = grt.image_list2numpy(warped_images)
-    grt.plot.scrollView3(Ic_numpy)
-    grt.plot.scrollView3(Ic_warped)
-    grt.plot.scrollGrid2(transformation.get_grid_numpy())
+    pplt.scrollView3(Ic_numpy)
+    pplt.scrollView3(Ic_warped)
+    pplt.scrollGrid2(transformation.get_grid_numpy())
     plt.show(block=True)
 
 if __name__ == '__main__':
