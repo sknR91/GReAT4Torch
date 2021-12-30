@@ -9,16 +9,10 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import GReAT4Torch as grt ## import torch based GReAT as grt
 
-sys.path.append('/Users/kai/Documents/great')
-import GReAT ## import numpy based GReAT for some helpful tools
-
 def main():
     start = time.time()
     dtype = torch.float32
     device = torch.device('cpu')
-
-    tools = GReAT.Tools()
-    pplt = GReAT.plot()
 
     ######## create blob data using numpy based GReAT-tools ############################################################
     #A = tools.compute_ball(np.array([160, 160, 160]), 20, np.array([80, 80, 80]))
@@ -27,27 +21,26 @@ def main():
 
     #Ic = [torch.Tensor(A).to(device).unsqueeze(0).unsqueeze(0), torch.Tensor(B).to(device).unsqueeze(0).unsqueeze(0),
     #      torch.Tensor(C).to(device).unsqueeze(0).unsqueeze(0)]
-    #Ic = [torch.Tensor(A).to(device), torch.Tensor(B).to(device), torch.Tensor(C).to(device)]
     #m = Ic[0].size()
+    #num_imgs = len(Ic)
     #dim = 3
     #h = torch.ones(1, dim)
     ####################################################################################################################
 
     ######## create circle data using numpy based GReAT-tools ############################################################
-    A = tools.compute_circle(np.array([400, 400]), 100, np.array([200, 200]))
-    B = tools.compute_circle(np.array([400, 400]), 120, np.array([220, 220]))
-    C = tools.compute_circle(np.array([400, 400]), 150, np.array([200, 200]))
+    A = grt.compute_circle(np.array([400, 400]), 100, np.array([200, 200]))
+    B = grt.compute_circle(np.array([400, 400]), 120, np.array([220, 220]))
+    C = grt.compute_circle(np.array([400, 400]), 150, np.array([200, 200]))
 
     Ic = [torch.Tensor(A).to(device).unsqueeze(0).unsqueeze(0), torch.Tensor(B).to(device).unsqueeze(0).unsqueeze(0),
           torch.Tensor(C).to(device).unsqueeze(0).unsqueeze(0)]
-    # Ic = [torch.Tensor(A).to(device), torch.Tensor(B).to(device), torch.Tensor(C).to(device)]
     m = Ic[0].size()
     num_imgs = len(Ic)
     dim = 2
     h = torch.ones(1, dim)
     ####################################################################################################################
 
-    registration = grt.GroupwiseRegistrationMultilevel(min_level=4, max_level=8, dtype=dtype, device=device)
+    registration = grt.GroupwiseRegistrationMultilevel(min_level=4, max_level=5, dtype=dtype, device=device)
     transformation = grt.NonParametricTransformation(m, num_imgs, dtype=dtype, device=device)
     registration.set_transformation_type(transformation)
 
@@ -57,12 +50,12 @@ def main():
     registration.set_distance_measure(distance_measure)
 
     regularizer = grt.CurvatureRegularizer(h)
-    regularizer.set_alpha(1e2)
+    regularizer.set_alpha(3e2)
     registration.set_regularizer(regularizer)
 
-    optimizer = torch.optim.Adamax(transformation.parameters(), lr=0.04)
+    optimizer = torch.optim.Adam(transformation.parameters(), lr=0.025)
     registration.set_optimizer(optimizer)
-    registration.set_max_iterations(75)
+    registration.set_max_iterations(4)
 
     ####################################
     registration.start()
@@ -74,8 +67,13 @@ def main():
     end = time.time()
 
     print(f"Registration done in {end-start} seconds.")
-    #pplt.scrollView3(Ic.cpu()[0, 0, ...].detach().numpy())
-    #pplt.scrollView3(warped_images.cpu()[0,0,...].detach().numpy())
+
+    pplt = grt.plot()
+    Ic_numpy = grt.image_list2numpy(Ic)
+    Ic_warped = grt.image_list2numpy(warped_images)
+    pplt.scrollView3(Ic_numpy)
+    pplt.scrollView3(Ic_warped)
+    pplt.scrollGrid2(transformation.get_grid_numpy())
     plt.show(block=True)
 
 if __name__ == '__main__':

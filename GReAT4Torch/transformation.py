@@ -2,6 +2,7 @@ import torch
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 import numpy as np
+from . import utils
 
 
 class _Transformation(torch.nn.Module):
@@ -24,6 +25,10 @@ class _Transformation(torch.nn.Module):
         elif self._dim == 4:
             print(f"INFO: Method nyi for dim = 4")
             pass
+
+    def get_grid_numpy(self):
+
+        return utils.displacement2grid(self()).cpu().detach().numpy()
 
     def get_displacement(self):
 

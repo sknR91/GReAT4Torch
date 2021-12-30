@@ -150,7 +150,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
                 m_resm1 = torch.round(m_res/2).int()
                 Ic_level = []
                 for k in range(0, num_images):
-                    tmp = F.interpolate(images_res[k], size=m_resm1[2:].tolist())
+                    tmp = F.interpolate(images_res[k], size=m_resm1[2:].tolist(), mode='bicubic')
                     Ic_level.append(tmp)
                 m_res = m_resm1
                 images_res = Ic_level

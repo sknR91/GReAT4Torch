@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
+import numpy as np
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -81,6 +82,29 @@ def prolong_displacements(displacement, new_size):
         prolonged_displacement.append(torch.stack(prolonged_tmp).squeeze())
 
     return torch.stack(prolonged_displacement)
+
+def displacement2grid(displacement):
+    dim = displacement.size()[1]
+    num_images = displacement.size()[0]
+    perm_a = np.roll(range(dim+1),-1).tolist() # permutation indices for grid dimensions
+    perm_b = np.roll(range(dim+2),-1).tolist() # perm. indices for final output (purpose: number of images is last)
+
+    grids = []
+    for k in range(num_images):
+        if dim == 2:
+            theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
+                                             device=displacement[0,...].device).unsqueeze(0).float(),
+                                displacement.size(2), displacement.size(3))
+        elif dim == 3:
+            theta = param2theta3(torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]],
+                                              device=displacement[0,...].device).unsqueeze(0).float(),
+                                 displacement.size(4), displacement.size(2), displacement.size(3))
+
+        id = F.affine_grid(theta, ([1, dim] + torch.tensor(displacement.size()[2:]).tolist()), align_corners=True)
+        grid_tmp = id[0,...] + displacement[k, ...].permute(perm_a).unsqueeze(0).unsqueeze(0)
+        grids.append(grid_tmp.squeeze())
+
+    return torch.stack(grids).permute(perm_b)
 
 def param2theta(param, w, h):
     theta = torch.zeros([param.size(0), 2, 3]).to(param.device)
@@ -185,3 +209,73 @@ def grad2d(img, h=None):
     dW = conv_W(img)
 
     return dH / h_H, dW / h_W
+
+def image_list2stack_numpy(image_list):
+
+    num_images = len(image_list)
+    num_pixels = np.prod(image_list[0].size().tolist())
+
+    stack = np.zeros(num_pixels, num_images)
+    for k in range(num_images):
+        stack[:, k] = image_list[k].flatten('F')
+
+    return stack
+
+def image_list2numpy(image_list):
+
+    image_size = np.array(image_list[0].size()[2:])
+    num_images = len(image_list)
+
+    images = np.zeros(np.append(image_size, num_images))
+    for k in range(num_images):
+        images[...,k] = image_list[k].squeeze()
+
+    return images
+
+def get_omega(m, h=1, invert=False, centershift=True):
+    tmp = np.zeros((m.size,2))
+    tmp[:,1] = h*m
+    y = tmp[0,1]; x = tmp[1,1]
+    tmp[0,1] = x; tmp[1,1] = y
+
+    if invert:
+        omega = tmp.reshape(2*m.size)
+        omg = omega.copy()
+        omega[0] = omg[2]
+        omega[1] = omg[3]
+        omega[2] = omg[0]
+        omega[3] = omg[1]
+    else:
+        omega = tmp.reshape(2*m.size)
+
+    if centershift:
+        h = np.array([h])
+        if len(h.shape) > 1:
+            if len(m.shape) == 2:
+                omega[0:2] = omega[0:2] + h[0] / 2
+                omega[2:] = omega[2:] + h[1] / 2
+            elif len(m.shape) == 3:
+                omega[0:2] = omega[0:2] + h[0] / 2
+                omega[2:4] = omega[2:4] + h[1] / 2
+                omega[4:] = omega[4:] + h[2] / 2
+        else:
+            omega = omega + h/2
+
+    return omega
+
+def compute_circle(image_size, radius, center):
+    x, y = np.ogrid[-center[0]:image_size[0] - center[0], -center[1]:image_size[1] - center[1]]
+    mask = x * x + y * y <= radius * radius
+    circ = np.zeros(image_size)
+    circ[mask] = 255
+
+    return circ
+
+def compute_ball(image_size, radius, center):
+    x, y, z = np.ogrid[-center[0]:image_size[0] - center[0], -center[1]:image_size[1] - center[1],
+            -center[2]:image_size[2] - center[2]]
+    mask = x * x + y * y + z * z <= radius * radius
+    ball = np.zeros(image_size)
+    ball[mask] = 255
+
+    return ball
