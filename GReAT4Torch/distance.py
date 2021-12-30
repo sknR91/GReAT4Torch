@@ -38,6 +38,9 @@ class _Distance(torch.nn.modules.Module):
     def set_pixel_spacing(self, pixel_spacing):
         self._h = pixel_spacing
 
+    def set_images(self, images):
+        self._images = images
+
     def return_distance(self, tensor):
         if self._size_average and self._reduce:
             return tensor.mean() * self._weight
@@ -51,7 +54,7 @@ class SqN(_Distance):
         super(SqN, self).__init__(images, size_average, reduce)
 
         self.name = "sqn"
-        self.images = images
+        self._images = images
         self.warped_images = None
         self.edge = 1e-3
         self.normalize = 'local'
@@ -133,7 +136,7 @@ class SqN(_Distance):
         return (val, U, S, V)
 
     def forward(self, displacement):
-        self.warped_images = utils.warp_images(images=self.images, displacement=displacement)
+        self.warped_images = utils.warp_images(images=self._images, displacement=displacement)
 
         f = plt.figure(1)
         f.clf()
@@ -145,7 +148,7 @@ class SqN(_Distance):
         plt.imshow(self.warped_images[2].cpu().squeeze().detach().numpy())
         plt.subplot(234)
         theta = utils.param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
-                                          device=self.images[0].device).unsqueeze(0).float(),
+                                               device=self._images[0].device).unsqueeze(0).float(),
                                   displacement.size(2), displacement.size(3))
         id = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
         self.pplt.plotGrid(id[0,...].cpu().detach().numpy()+displacement[0,...].permute(1,2,0).cpu().detach().numpy())
@@ -162,7 +165,7 @@ class SqN(_Distance):
         h = self._h
         q = self.q
 
-        nP = self.images[0].numel()
+        nP = self._images[0].numel()
         hd = torch.prod(h)
 
         Ic_x, Ic_y, Ic_z = self._normalized_gradients(self.warped_images, self.edge, self._h, self.normalize)

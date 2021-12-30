@@ -34,9 +34,9 @@ def main():
     ####################################################################################################################
 
     ######## create circle data using numpy based GReAT-tools ############################################################
-    A = tools.compute_circle(np.array([20, 20]), 5, np.array([10, 10]))
-    B = tools.compute_circle(np.array([20, 20]), 6, np.array([12, 12]))
-    C = tools.compute_circle(np.array([20, 20]), 7, np.array([10, 10]))
+    A = tools.compute_circle(np.array([400, 400]), 100, np.array([200, 200]))
+    B = tools.compute_circle(np.array([400, 400]), 120, np.array([220, 220]))
+    C = tools.compute_circle(np.array([400, 400]), 150, np.array([200, 200]))
 
     Ic = [torch.Tensor(A).to(device).unsqueeze(0).unsqueeze(0), torch.Tensor(B).to(device).unsqueeze(0).unsqueeze(0),
           torch.Tensor(C).to(device).unsqueeze(0).unsqueeze(0)]
@@ -47,7 +47,7 @@ def main():
     h = torch.ones(1, dim)
     ####################################################################################################################
 
-    registration = grt.GroupwiseRegistration(dtype=dtype, device=device)
+    registration = grt.GroupwiseRegistrationMultilevel(min_level=4, max_level=8, dtype=dtype, device=device)
     transformation = grt.NonParametricTransformation(m, num_imgs, dtype=dtype, device=device)
     registration.set_transformation_type(transformation)
 
@@ -60,9 +60,9 @@ def main():
     regularizer.set_alpha(1e2)
     registration.set_regularizer(regularizer)
 
-    optimizer = torch.optim.Adamax(transformation.parameters(), lr=0.01)
+    optimizer = torch.optim.Adamax(transformation.parameters(), lr=0.04)
     registration.set_optimizer(optimizer)
-    registration.set_max_iterations(1000)
+    registration.set_max_iterations(75)
 
     ####################################
     registration.start()

@@ -59,6 +59,29 @@ def warp_images(images, displacement):
 
     return warpedIc
 
+def prolong_displacements(displacement, new_size):
+    new_size = new_size[2:]
+    dim = len(new_size)
+    num_images = displacement.size()[0]
+
+    prolonged_displacement = []
+    for k in range(num_images):
+        prolonged_tmp = [] ## save single coordinates for later concatenation
+        for j in range(dim):
+            if dim == 2:
+                theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
+                                                 device=displacement[0,...].device).unsqueeze(0).float(),
+                                    new_size[0], new_size[1])
+            elif dim == 3:
+                theta = param2theta3(torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]],
+                                                  device=displacement[0,...].device).unsqueeze(0).float(),
+                                     new_size[2], new_size[0], new_size[1])
+            id = F.affine_grid(theta, ([1, dim] + new_size.tolist()), align_corners=True)
+            prolonged_tmp.append(F.grid_sample(displacement[k,j,...].unsqueeze(0).unsqueeze(0), id, align_corners=True))
+        prolonged_displacement.append(torch.stack(prolonged_tmp).squeeze())
+
+    return torch.stack(prolonged_displacement)
+
 def param2theta(param, w, h):
     theta = torch.zeros([param.size(0), 2, 3]).to(param.device)
     theta[:, 0, 0] = param[:, 0, 0]
