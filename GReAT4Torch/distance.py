@@ -2,13 +2,9 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from . import utils
+from . import plot
 from torch import nn
-
-
 import matplotlib.pyplot as plt
-import sys
-sys.path.append('/Users/kai/Documents/great')
-import GReAT ## import numpy based GReAT for some helpful tools
 
 class _Distance(torch.nn.modules.Module):
     def __init__(self, images, size_average=True, reduce=True):
@@ -59,7 +55,6 @@ class SqN(_Distance):
         self.edge = 1e-3
         self.normalize = 'local'
         self.q = 4
-        self.pplt = GReAT.plot()
 
     def set_edge_parameter(self, edge):
         self.edge = edge
@@ -151,11 +146,11 @@ class SqN(_Distance):
                                                device=self._images[0].device).unsqueeze(0).float(),
                                   displacement.size(2), displacement.size(3))
         id = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
-        self.pplt.plotGrid(id[0,...].cpu().detach().numpy()+displacement[0,...].permute(1,2,0).cpu().detach().numpy())
+        plot.plotGrid(id[0,...].cpu().detach().numpy()+displacement[0,...].permute(1,2,0).cpu().detach().numpy())
         plt.subplot(235)
-        self.pplt.plotGrid(id[0,...].cpu().detach().numpy() + displacement[1,...].permute(1, 2, 0).cpu().detach().numpy())
+        plot.plotGrid(id[0,...].cpu().detach().numpy() + displacement[1,...].permute(1, 2, 0).cpu().detach().numpy())
         plt.subplot(236)
-        self.pplt.plotGrid(id[0,...].cpu().detach().numpy() + displacement[2,...].permute(1, 2, 0).cpu().detach().numpy())
+        plot.plotGrid(id[0,...].cpu().detach().numpy() + displacement[2,...].permute(1, 2, 0).cpu().detach().numpy())
         plt.pause(0.001)
 
         m = self._m

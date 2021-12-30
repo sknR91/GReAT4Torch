@@ -3,8 +3,9 @@ from setuptools import setup, find_packages
 __version__ = '0.1'
 url = ''
 
-install_requires = ['torch, numpy, matplotlib']
-
+install_requires = ['torch',
+                    'numpy',
+                    'matplotlib']
 
 setup(
     name='GReAT4Torch',

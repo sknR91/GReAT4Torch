@@ -68,12 +68,11 @@ def main():
 
     print(f"Registration done in {end-start} seconds.")
 
-    pplt = grt.plot()
     Ic_numpy = grt.image_list2numpy(Ic)
     Ic_warped = grt.image_list2numpy(warped_images)
-    pplt.scrollView3(Ic_numpy)
-    pplt.scrollView3(Ic_warped)
-    pplt.scrollGrid2(transformation.get_grid_numpy())
+    grt.plot.scrollView3(Ic_numpy)
+    grt.plot.scrollView3(Ic_warped)
+    grt.plot.scrollGrid2(transformation.get_grid_numpy())
     plt.show(block=True)
 
 if __name__ == '__main__':
