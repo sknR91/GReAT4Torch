@@ -57,10 +57,10 @@ class plot:
             skip : (optional) skip every
             kwargs : further keyword arguments are forwarded to matplotlib
         """
-        self.fig = plt.figure(fignr)
         self.fig.add_subplot(111, projection = '3d')
-        if newFig:
-            self.fig, self.ax = plt.subplots(subplot_kw={'projection': '3d'})
+        if not newFig:
+            self.fig = plt.figure(fignr)
+            self.fig, _ = plt.subplots(subplot_kw={'projection': '3d'})
 
         if 'color' not in kwargs:
             kwargs['color'] = 'C0'
@@ -140,7 +140,7 @@ class plot:
         self.ax.idx = volume.shape[-2] // 2
         self.ax.tpnt = volume.shape[-1] // 2
         self.ax.viewer = 'scrollView4'
-        self.ax.imshow(volume[:, :, self.ax.idx, self.ax.tpnt], cmap='gray', extent=omega)
+        self.plotted_image = self.ax.imshow(volume[:, :, self.ax.idx, self.ax.tpnt], cmap='gray', extent=omega)
         self.fig.canvas.mpl_connect('key_press_event', self._process_key)
 
     def scroll_grid_2d(self, gridStack):
@@ -163,7 +163,7 @@ class plot:
 
     def _process_key(self, event):
         self.fig = event.canvas.figure
-        self.ax = self.fig.axes[0]
+        #self.ax = self.fig.axes[0]
         if event.key == 'w' or event.key == 'up': # arrow up
             self._previous_slice()
         elif event.key == 's' or event.key == 'down': # arrow down
@@ -192,7 +192,7 @@ class plot:
         elif self.ax.viewer == 'scrollGrid3':
             self.ax.idx = (self.ax.idx - 1) % vol.shape[-1]
             plt.gca(); plt.cla()
-            self.plot_grid_3d(vol[:, :, :, :, self.ax.idx], newFig=False)
+            self.plot_grid_3d(vol[:, :, :, :, self.ax.idx])
             self.fig.canvas.draw_idle()
         ttl = 'Position: {0} of {1}'.format(self.ax.idx, vol.shape[-1])
         self.ax.set_xlabel(ttl)
@@ -201,6 +201,7 @@ class plot:
         vol = self.ax.vol
         self.ax.tpnt = (self.ax.tpnt - 1) % vol.shape[-1]
         self.plotted_image.set_array(vol[:,:,self.ax.idx,self.ax.tpnt])
+        self.fig.canvas.draw_idle()
 
     def _next_slice(self):
         vol = self.ax.vol
@@ -220,7 +221,7 @@ class plot:
         elif self.ax.viewer == 'scrollGrid3':
             self.ax.idx = (self.ax.idx + 1) % vol.shape[-1]
             plt.gca(); plt.cla()
-            self.plot_grid_3d(vol[:, :, :, :, self.ax.idx], newFig=False)
+            self.plot_grid_3d(vol[:, :, :, :, self.ax.idx])
             self.fig.canvas.draw_idle()
         ttl = 'Position: {0} of {1}'.format(self.ax.idx, vol.shape[-1])
         self.ax.set_xlabel(ttl)
@@ -229,6 +230,7 @@ class plot:
         vol = self.ax.vol
         self.ax.tpnt = (self.ax.tpnt + 1) % vol.shape[-1]
         self.plotted_image.set_array(vol[:, :, self.ax.idx, self.ax.tpnt])
+        self.fig.canvas.draw_idle()
 
     def plot_mip(self, volume, omega=None, permute=None, colormap='gray', colorbar=False, fliptranspose=False):
         if permute is not None:

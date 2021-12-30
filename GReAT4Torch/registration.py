@@ -128,6 +128,12 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         num_images = self._transformation_type._num_images
         min_level = self._min_level
         m_level = image_size
+        dim = image_size.numel()-2
+
+        if dim == 2:
+            interpolation_mode = 'bicubic'
+        elif dim == 3:
+            interpolation_mode = 'trilinear'
 
         max_level, image_size_level, num_pixels_level, max_level_data = \
             self._get_max_level_parameters(self._max_level, image_size)
@@ -141,7 +147,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
             if level == max_level_data: ## take original data to resize to max_level
                 Ic_level = []
                 for k in range(num_images):
-                    tmp = F.interpolate(images[k], size=image_size[2:].tolist(), mode='bicubic')
+                    tmp = F.interpolate(images[k], size=image_size[2:].tolist(), mode=interpolation_mode)
                     Ic_level.append(tmp)
                 images_res = Ic_level
                 m_res = m_level
@@ -149,7 +155,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
                 m_resm1 = torch.round(m_res/2).int()
                 Ic_level = []
                 for k in range(0, num_images):
-                    tmp = F.interpolate(images_res[k], size=m_resm1[2:].tolist(), mode='bicubic')
+                    tmp = F.interpolate(images_res[k], size=m_resm1[2:].tolist(), mode=interpolation_mode)
                     Ic_level.append(tmp)
                 m_res = m_resm1
                 images_res = Ic_level
