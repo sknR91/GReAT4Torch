@@ -70,7 +70,7 @@ class GroupwiseRegistration(_GroupwiseRegistration):
         obj = dist + regul
 
         # some output
-        print(f"Current value of objective function D + R = J: {dist} + {regul} = {obj}")
+        print(f"distance + regularizer = objective: {dist} + {regul} = {obj}")
 
         obj.backward()
 
@@ -78,7 +78,7 @@ class GroupwiseRegistration(_GroupwiseRegistration):
 
     def start(self):
         for iter in range(self._max_iterations):
-            print(f"Iteration {iter}: ", end='', flush=True)
+            print(f" Iter {iter}: ", end='', flush=True)
             obj = self._optimizer.step(self._driver)
 
 class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
@@ -105,7 +105,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         obj = dist + regul
 
         # some output
-        print(f"Current value of objective function D + R = J: {dist} + {regul} = {obj}")
+        print(f"distance + regularizer = objective: {dist} + {regul} = {obj}")
 
         obj.backward()
 
@@ -165,7 +165,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
 
         # iterate over all levels
         for level in range(self._min_level, self._max_level+1):
-            print(f"Level {level}, ", end='', flush=True)
+            print(f"\n", '='*30, f" Level {level}", '='*30)
             self._distance_measure.set_images(images_levels[level])
             #self._transformation_type.set_image_size(image_sizes_levels[level])
 
@@ -184,11 +184,11 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
             if level != self._min_level:
                 optim_attributes['lr'] = optim_attributes['lr'] / 10
 
-                # reinitialize the optimizer instance with new "params" and all pre-set attributes!
+            # reinitialize the optimizer instance with new "params" and all pre-set attributes!
             self._optimizer.__init__(self._transformation_type.parameters(), **optim_attributes)
 
             for iter in range(self._max_iterations):
-                print(f" Iteration {iter}: ", end='', flush=True)
+                print(f" Iter {iter}: ", end='', flush=True)
                 obj = self._optimizer.step(self._driver)
 
             displacement = self._transformation_type.get_displacement()

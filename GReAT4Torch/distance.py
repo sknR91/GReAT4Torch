@@ -147,11 +147,14 @@ class SqN(_Distance):
                                                    device=self._images[0].device).unsqueeze(0).float(),
                                       displacement.size(2), displacement.size(3))
             id = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
-            plot.plotGrid(id[0,...].cpu().detach().numpy()+displacement[0,...].permute(1,2,0).cpu().detach().numpy())
+            plot.plot_grid_2d(
+                id[0, ...].cpu().detach().numpy() + displacement[0, ...].permute(1, 2, 0).cpu().detach().numpy(), )
             plt.subplot(235)
-            plot.plotGrid(id[0,...].cpu().detach().numpy() + displacement[1,...].permute(1, 2, 0).cpu().detach().numpy())
+            plot.plot_grid_2d(
+                id[0, ...].cpu().detach().numpy() + displacement[1, ...].permute(1, 2, 0).cpu().detach().numpy(), )
             plt.subplot(236)
-            plot.plotGrid(id[0,...].cpu().detach().numpy() + displacement[2,...].permute(1, 2, 0).cpu().detach().numpy())
+            plot.plot_grid_2d(
+                id[0, ...].cpu().detach().numpy() + displacement[2, ...].permute(1, 2, 0).cpu().detach().numpy(), )
             plt.pause(0.001)
 
         m = self._m
