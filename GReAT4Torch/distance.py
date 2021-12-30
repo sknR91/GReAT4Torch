@@ -133,25 +133,26 @@ class SqN(_Distance):
     def forward(self, displacement):
         self.warped_images = utils.warp_images(images=self._images, displacement=displacement)
 
-        f = plt.figure(1)
-        f.clf()
-        plt.subplot(231)
-        plt.imshow(self.warped_images[0].cpu().squeeze().detach().numpy())
-        plt.subplot(232)
-        plt.imshow(self.warped_images[1].cpu().squeeze().detach().numpy())
-        plt.subplot(233)
-        plt.imshow(self.warped_images[2].cpu().squeeze().detach().numpy())
-        plt.subplot(234)
-        theta = utils.param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
-                                               device=self._images[0].device).unsqueeze(0).float(),
-                                  displacement.size(2), displacement.size(3))
-        id = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
-        plot.plotGrid(id[0,...].cpu().detach().numpy()+displacement[0,...].permute(1,2,0).cpu().detach().numpy())
-        plt.subplot(235)
-        plot.plotGrid(id[0,...].cpu().detach().numpy() + displacement[1,...].permute(1, 2, 0).cpu().detach().numpy())
-        plt.subplot(236)
-        plot.plotGrid(id[0,...].cpu().detach().numpy() + displacement[2,...].permute(1, 2, 0).cpu().detach().numpy())
-        plt.pause(0.001)
+        if False:
+            f = plt.figure(1)
+            f.clf()
+            plt.subplot(231)
+            plt.imshow(self.warped_images[0].cpu().squeeze().detach().numpy())
+            plt.subplot(232)
+            plt.imshow(self.warped_images[1].cpu().squeeze().detach().numpy())
+            plt.subplot(233)
+            plt.imshow(self.warped_images[2].cpu().squeeze().detach().numpy())
+            plt.subplot(234)
+            theta = utils.param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
+                                                   device=self._images[0].device).unsqueeze(0).float(),
+                                      displacement.size(2), displacement.size(3))
+            id = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
+            plot.plotGrid(id[0,...].cpu().detach().numpy()+displacement[0,...].permute(1,2,0).cpu().detach().numpy())
+            plt.subplot(235)
+            plot.plotGrid(id[0,...].cpu().detach().numpy() + displacement[1,...].permute(1, 2, 0).cpu().detach().numpy())
+            plt.subplot(236)
+            plot.plotGrid(id[0,...].cpu().detach().numpy() + displacement[2,...].permute(1, 2, 0).cpu().detach().numpy())
+            plt.pause(0.001)
 
         m = self._m
         dim = self._dim
@@ -177,8 +178,8 @@ class SqN(_Distance):
         Ic_n = Ic_n.permute((1, 2, 3, 0))
 
         rc, _, _, _ = self._sqnorm(Ic_n[0, 0, :, :], q)
-        #hd = hd * np.sqrt(nP)
-        #Dc = hd * rc
-        Dc = rc
+        hd = hd * np.sqrt(nP)
+        Dc = hd * rc
+        #Dc = rc
 
         return self.return_distance(-Dc)

@@ -29,8 +29,8 @@ def main():
 
     ######## create circle data using numpy based GReAT-tools ############################################################
     A = grt.compute_circle(np.array([400, 400]), 100, np.array([200, 200]))
-    B = grt.compute_circle(np.array([400, 400]), 120, np.array([220, 220]))
-    C = grt.compute_circle(np.array([400, 400]), 150, np.array([200, 200]))
+    B = grt.compute_circle(np.array([400, 400]), 100, np.array([250, 220]))
+    C = grt.compute_circle(np.array([400, 400]), 100, np.array([170, 200]))
 
     Ic = [torch.Tensor(A).to(device).unsqueeze(0).unsqueeze(0), torch.Tensor(B).to(device).unsqueeze(0).unsqueeze(0),
           torch.Tensor(C).to(device).unsqueeze(0).unsqueeze(0)]
@@ -40,22 +40,24 @@ def main():
     h = torch.ones(1, dim)
     ####################################################################################################################
 
-    registration = grt.GroupwiseRegistrationMultilevel(min_level=9, max_level=9, dtype=dtype, device=device)
+    registration = grt.GroupwiseRegistrationMultilevel(min_level=4, max_level=6, dtype=dtype, device=device)
     transformation = grt.NonParametricTransformation(m, num_imgs, dtype=dtype, device=device)
     registration.set_transformation_type(transformation)
 
     distance_measure = grt.SqN(Ic)
     distance_measure.set_normalization_method('local')
+    distance_measure.set_q_parameter(4)
+    distance_measure.set_edge_parameter(1e1)
     #distance_measure.set_distance_weight(1e-2)
     registration.set_distance_measure(distance_measure)
 
     regularizer = grt.CurvatureRegularizer(h)
-    regularizer.set_alpha(3e2)
+    regularizer.set_alpha(7e3)
     registration.set_regularizer(regularizer)
 
-    optimizer = torch.optim.Adam(transformation.parameters(), lr=0.025)
+    optimizer = torch.optim.Adam(transformation.parameters(), lr=0.2)
     registration.set_optimizer(optimizer)
-    registration.set_max_iterations(4)
+    registration.set_max_iterations(555)
 
     ####################################
     registration.start()

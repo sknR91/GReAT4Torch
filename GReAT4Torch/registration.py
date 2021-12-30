@@ -181,8 +181,10 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
             # fetch all attributes from the original optimizer to pass it to a freshly initialized instance
             optim_attributes = { _key : self._optimizer.param_groups[0][_key] for _key in self._optimizer.param_groups[0] }
             del optim_attributes['params']
+            if level != self._min_level:
+                optim_attributes['lr'] = optim_attributes['lr'] / 10
 
-            # reinitialize the optimizer instance with new "params" and all pre-set attributes!
+                # reinitialize the optimizer instance with new "params" and all pre-set attributes!
             self._optimizer.__init__(self._transformation_type.parameters(), **optim_attributes)
 
             for iter in range(self._max_iterations):
