@@ -324,3 +324,75 @@ def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=Fals
             k += 1
 
     return imagelist
+
+
+def svd_2x2(arg):
+    d11 = arg[:, 0] * arg[:, 0] + arg[:, 2] * arg[:, 2]
+    d12 = arg[:, 0] * arg[:, 1] + arg[:, 2] * arg[:, 3] # = d21
+    d22 = arg[:, 1] * arg[:, 1] + arg[:, 3] * arg[:, 3]
+
+    trace = d11 + d22
+    det = d11 * d22 - d12 * d12
+    d = torch.sqrt(torch.max(torch.tensor([0, 0.25 * trace * trace - det])))
+    lmax = torch.max(torch.tensor(0, 0.5 * trace + d))
+    lmin = torch.min(torch.tensor(0, 0.5 * trace - d))
+    smax = torch.sqrt(lmax)
+    smin = torch.sqrt(lmin)
+
+    return smax, smin
+
+
+def svd_3x3(arg):
+    # compute entries of matrx arg.T * arg
+    d11 = arg[:, 0] * arg[:, 0] + arg[:, 3] * arg[0, 3] + arg[0, 6] * arg[0, 6]
+    d22 = arg[:, 1] * arg[:, 1] + arg[:, 4] * arg[0, 4] + arg[0, 7] * arg[0, 7]
+    d33 = arg[:, 2] * arg[:, 2] + arg[:, 5] * arg[0, 5] + arg[0, 8] * arg[0, 8]
+    d12 = arg[:, 0] * arg[:, 1] + arg[:, 3] * arg[:, 4] + arg[:, 6] * arg[:, 7]  # = d21
+    d13 = arg[:, 0] * arg[:, 2] + arg[:, 3] * arg[:, 5] + arg[:, 6] * arg[:, 8]  # = d31
+    d23 = arg[:, 1] * arg[:, 2] + arg[:, 4] * arg[:, 5] + arg[:, 7] * arg[:, 8]  # = d32
+
+    # compute coefficients of characteristic polynomial
+    a = 1
+    b = -(d11 + d22 + d33)
+    c = d11 * d22 + d11 * d33 + d22 * d33 - d23 * d23 - d12 * d12 - d13 * d13
+    d = -d11 * d22 * d33 + d11 * d21 * d23 + d12 * d12 * d33 - d12 * d23 * d13 - d13 * d12 * d23 + d13 * d13 * d22
+
+    e1, e2, e3 = cardano(a, b, c, d)
+    sings = np.sqrt(np.array([e1, e2, e3]))
+
+    return sings[0], sings[1], sings[2]
+
+
+def cardano(A, B, C, D):
+    # normalize coefficients
+    if A == 1:
+        a = B
+        b = C
+        c = D
+    else:  # A != 1:
+        a = B / A
+        b = C / A
+        c = D / A
+
+    p = b - a * a / 3
+    q = 2 * a * a * a / 27 - a * b / 3 + c
+
+    discriminant = q * q / 4 + p * p * p / 27
+
+    u = (-q / 2 + np.sqrt(discriminant)) ** (1 / 3)
+    v = (-q / 2 - np.sqrt(discriminant)) ** (1 / 3)
+
+    eps1 = -1 / 2 + 1 / 2 * 1j * np.sqrt(3)
+    eps2 = -1 / 2 - 1 / 2 * 1j * np.sqrt(3)
+
+    # substitutional solutions
+    z1 = u + v
+    z2 = u * eps1 + v * eps2
+    z3 = u * eps2 + v * eps1
+
+    # resubstitution
+    x1 = z1 - a / 3
+    x2 = z2 - a / 3
+    x3 = z3 - a / 3
+
+    return x1, x2, x3
