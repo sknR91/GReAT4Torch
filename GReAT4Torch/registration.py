@@ -24,6 +24,9 @@ class _Registration():
         # set transformation type
         self._transformation_type = None
 
+        # set flag for printing iteration information
+        self._print_info = True
+
     def set_distance_measure(self, distance):
         self._distance_measure = distance
 
@@ -38,6 +41,9 @@ class _Registration():
 
     def set_transformation_type(self, transformation_type):
         self._transformation_type = transformation_type
+
+    def set_print_info(self, flag):
+        self._print_info = flag
 
 class _GroupwiseRegistration(_Registration):
     def __init__(self, dtype=torch.float32, device='cpu'):
@@ -70,15 +76,21 @@ class GroupwiseRegistration(_GroupwiseRegistration):
         obj = dist + regul
 
         # some output
-        print(f"distance + regularizer = objective: {dist} + {regul} = {obj}")
+        if self._print_info:
+            print(f"distance + regularizer = objective: {dist} + {regul} = {obj}")
 
         obj.backward()
 
         return obj
 
     def start(self):
+        print("="*30, " Starting groupwise image registration ", "="*30)
+        print("-- Distance Measure: ", self._distance_measure.name)
+        print("-- Regularizer: ", self._regularizer.name)
+
         for iter in range(self._max_iterations):
-            print(f" Iter {iter}: ", end='', flush=True)
+            if self._print_info:
+                print(f" Iter {iter}: ", end='', flush=True)
             obj = self._optimizer.step(self._driver)
 
 class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
@@ -105,7 +117,8 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         obj = dist + regul
 
         # some output
-        print(f"distance + regularizer = objective: {dist} + {regul} = {obj}")
+        if self._print_info:
+            print(f"distance + regularizer = objective: {dist} + {regul} = {obj}")
 
         obj.backward()
 
@@ -169,6 +182,12 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         self.set_images(self._distance_measure._images)
         images_levels, image_sizes_levels = self._compute_multilevel_data()
 
+        print("=" * 30, " Starting multilevel groupwise image registration ", "=" * 30)
+        print("-- Distance Measure: ", self._distance_measure.name)
+        print("-- Regularizer: ", self._regularizer.name)
+        print(f"-- Level(s): {self._min_level} to {self._max_level}")
+        print(f"-- Level of full resolution: {len(image_sizes_levels)} ({image_sizes_levels[-1][2:].tolist()})\n")
+
         # iterate over all levels
         for level in range(self._min_level, self._max_level+1):
             print(f"\n", '='*30, f" Level {level}", '='*30)
@@ -194,7 +213,8 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
             self._optimizer.__init__(self._transformation_type.parameters(), **optim_attributes)
 
             for iter in range(self._max_iterations):
-                print(f" Iter {iter}: ", end='', flush=True)
+                if self._print_info:
+                    print(f" Iter {iter}: ", end='', flush=True)
                 obj = self._optimizer.step(self._driver)
 
             displacement = self._transformation_type.get_displacement()

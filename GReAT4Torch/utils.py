@@ -2,14 +2,17 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 import numpy as np
+import os
+import matplotlib.pyplot as plt
 import warnings
+
 warnings.filterwarnings("ignore")
 
-def compute_grid(image_size, dtype=torch.float32, device='cpu'):
 
+def compute_grid(image_size, dtype=torch.float32, device='cpu'):
     dim = len(image_size)
 
-    if(dim == 2):
+    if (dim == 2):
         nx = image_size[0]
         ny = image_size[1]
 
@@ -24,7 +27,7 @@ def compute_grid(image_size, dtype=torch.float32, device='cpu'):
 
         return torch.cat((x, y), 3).to(dtype=dtype, device=device)
 
-    elif(dim == 3):
+    elif (dim == 3):
         nz = image_size[0]
         ny = image_size[1]
         nx = image_size[2]
@@ -43,22 +46,29 @@ def compute_grid(image_size, dtype=torch.float32, device='cpu'):
 
         return torch.cat((x, y, z), 4).to(dtype=dtype, device=device)
 
+
 def warp_images(images, displacement):
-    dim = len(images[0].size())-2
+    dim = len(images[0].size()) - 2
     warpedIc = []
     for k in range(len(images)):
         if dim == 2:
             theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]], device=images[0].device).unsqueeze(0).float(),
                                 displacement.size(2), displacement.size(3))
-            id = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size(), align_corners=True)
-            warpedIc.append(F.grid_sample(images[k], id + displacement[k, :, :, :].squeeze().permute(1, 2, 0).unsqueeze(0), align_corners=True))
+            id = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size(),
+                               align_corners=True)
+            warpedIc.append(
+                F.grid_sample(images[k], id + displacement[k, :, :, :].squeeze().permute(1, 2, 0).unsqueeze(0),
+                              align_corners=True))
         elif dim == 3:
             theta = param2theta3(torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]],
-                                              device=images[0].device).unsqueeze(0).float(), displacement.size(4), displacement.size(2), displacement.size(3))
+                                              device=images[0].device).unsqueeze(0).float(), displacement.size(4),
+                                 displacement.size(2), displacement.size(3))
             id = F.affine_grid(theta, displacement[0, 0, :, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
-            warpedIc.append(F.grid_sample(images[k], id + displacement[k, :, :, :, :].squeeze().permute(1, 2, 3, 0).unsqueeze(0)))
+            warpedIc.append(
+                F.grid_sample(images[k], id + displacement[k, :, :, :, :].squeeze().permute(1, 2, 3, 0).unsqueeze(0)))
 
     return warpedIc
+
 
 def prolong_displacements(displacement, new_size):
     new_size = new_size[2:]
@@ -67,44 +77,47 @@ def prolong_displacements(displacement, new_size):
 
     prolonged_displacement = []
     for k in range(num_images):
-        prolonged_tmp = [] ## save single coordinates for later concatenation
+        prolonged_tmp = []  ## save single coordinates for later concatenation
         for j in range(dim):
             if dim == 2:
                 theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
-                                                 device=displacement[0,...].device).unsqueeze(0).float(),
+                                                 device=displacement[0, ...].device).unsqueeze(0).float(),
                                     new_size[0], new_size[1])
             elif dim == 3:
                 theta = param2theta3(torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]],
-                                                  device=displacement[0,...].device).unsqueeze(0).float(),
+                                                  device=displacement[0, ...].device).unsqueeze(0).float(),
                                      new_size[2], new_size[0], new_size[1])
             id = F.affine_grid(theta, ([1, dim] + new_size.tolist()), align_corners=True)
-            prolonged_tmp.append(F.grid_sample(displacement[k,j,...].unsqueeze(0).unsqueeze(0), id, align_corners=True))
+            prolonged_tmp.append(
+                F.grid_sample(displacement[k, j, ...].unsqueeze(0).unsqueeze(0), id, align_corners=True))
         prolonged_displacement.append(torch.stack(prolonged_tmp).squeeze())
 
     return torch.stack(prolonged_displacement)
 
+
 def displacement2grid(displacement):
     dim = displacement.size()[1]
     num_images = displacement.size()[0]
-    perm_a = np.roll(range(dim+1),-1).tolist() # permutation indices for grid dimensions
-    perm_b = np.roll(range(dim+2),-1).tolist() # perm. indices for final output (purpose: number of images is last)
+    perm_a = np.roll(range(dim + 1), -1).tolist()  # permutation indices for grid dimensions
+    perm_b = np.roll(range(dim + 2), -1).tolist()  # perm. indices for final output (purpose: number of images is last)
 
     grids = []
     for k in range(num_images):
         if dim == 2:
             theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
-                                             device=displacement[0,...].device).unsqueeze(0).float(),
+                                             device=displacement[0, ...].device).unsqueeze(0).float(),
                                 displacement.size(2), displacement.size(3))
         elif dim == 3:
             theta = param2theta3(torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]],
-                                              device=displacement[0,...].device).unsqueeze(0).float(),
+                                              device=displacement[0, ...].device).unsqueeze(0).float(),
                                  displacement.size(4), displacement.size(2), displacement.size(3))
 
         id = F.affine_grid(theta, ([1, dim] + torch.tensor(displacement.size()[2:]).tolist()), align_corners=True)
-        grid_tmp = id[0,...] + displacement[k, ...].permute(perm_a).unsqueeze(0).unsqueeze(0)
+        grid_tmp = id[0, ...] + displacement[k, ...].permute(perm_a).unsqueeze(0).unsqueeze(0)
         grids.append(grid_tmp.squeeze())
 
     return torch.stack(grids).permute(perm_b)
+
 
 def param2theta(param, w, h):
     theta = torch.zeros([param.size(0), 2, 3]).to(param.device)
@@ -116,6 +129,7 @@ def param2theta(param, w, h):
     theta[:, 1, 2] = param[:, 1, 2] * 2 / h + theta[:, 1, 0] + theta[:, 1, 1] - 1
 
     return theta
+
 
 def param2theta3(param, d, w, h):
     theta = torch.zeros([param.size(0), 3, 4]).to(param.device)
@@ -134,8 +148,8 @@ def param2theta3(param, d, w, h):
 
     return theta
 
-def grad3d(img, h=None):
 
+def grad3d(img, h=None):
     """"
     Args:
         img:
@@ -176,7 +190,6 @@ def grad3d(img, h=None):
 
 
 def grad2d(img, h=None):
-
     """"
     Args:
         img:
@@ -210,8 +223,8 @@ def grad2d(img, h=None):
 
     return dH / h_H, dW / h_W
 
-def image_list2stack_numpy(image_list):
 
+def image_list2stack_numpy(image_list):
     num_images = len(image_list)
     num_pixels = np.prod(image_list[0].size().tolist())
 
@@ -221,32 +234,35 @@ def image_list2stack_numpy(image_list):
 
     return stack
 
-def image_list2numpy(image_list):
 
+def image_list2numpy(image_list):
     image_size = np.array(image_list[0].size()[2:])
     num_images = len(image_list)
 
     images = np.zeros(np.append(image_size, num_images))
     for k in range(num_images):
-        images[...,k] = image_list[k].squeeze()
+        images[..., k] = image_list[k].squeeze()
 
     return images
 
+
 def get_omega(m, h=1, invert=False, centershift=True):
-    tmp = np.zeros((m.size,2))
-    tmp[:,1] = h*m
-    y = tmp[0,1]; x = tmp[1,1]
-    tmp[0,1] = x; tmp[1,1] = y
+    tmp = np.zeros((m.size, 2))
+    tmp[:, 1] = h * m
+    y = tmp[0, 1];
+    x = tmp[1, 1]
+    tmp[0, 1] = x;
+    tmp[1, 1] = y
 
     if invert:
-        omega = tmp.reshape(2*m.size)
+        omega = tmp.reshape(2 * m.size)
         omg = omega.copy()
         omega[0] = omg[2]
         omega[1] = omg[3]
         omega[2] = omg[0]
         omega[3] = omg[1]
     else:
-        omega = tmp.reshape(2*m.size)
+        omega = tmp.reshape(2 * m.size)
 
     if centershift:
         h = np.array([h])
@@ -259,9 +275,10 @@ def get_omega(m, h=1, invert=False, centershift=True):
                 omega[2:4] = omega[2:4] + h[1] / 2
                 omega[4:] = omega[4:] + h[2] / 2
         else:
-            omega = omega + h/2
+            omega = omega + h / 2
 
     return omega
+
 
 def compute_circle(image_size, radius, center):
     x, y = np.ogrid[-center[0]:image_size[0] - center[0], -center[1]:image_size[1] - center[1]]
@@ -271,11 +288,39 @@ def compute_circle(image_size, radius, center):
 
     return circ
 
+
 def compute_ball(image_size, radius, center):
     x, y, z = np.ogrid[-center[0]:image_size[0] - center[0], -center[1]:image_size[1] - center[1],
-            -center[2]:image_size[2] - center[2]]
+              -center[2]:image_size[2] - center[2]]
     mask = x * x + y * y + z * z <= radius * radius
     ball = np.zeros(image_size)
     ball[mask] = 255
 
     return ball
+
+
+def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=False, dtype=torch.float32,
+                   device=torch.device('cpu')):
+    # skipping subdirectories!
+    files = sorted([f for f in os.listdir(path) if f.lower().endswith(type) and os.path.isfile(os.path.join(path, f))])
+
+    imagelist = []
+    k = 0
+    for file in files:
+        if file.lower().endswith(type):
+            image = torch.tensor(plt.imread(path + file), dtype=dtype, device=device)
+            if grayscale:
+                if len(image.shape) > 2:
+                    image = image[:, :, 0]
+            if scale:
+                imagelist.append((image / np.max(image)))
+            elif not grayscale:
+                imagelist.append(image.unsqueeze(0))
+            else:
+                imagelist.append(image.unsqueeze(0).unsqueeze(0))
+
+            if size is not None:
+                imagelist[k] = F.interpolate(imagelist[k], size=size[2:].tolist())
+            k += 1
+
+    return imagelist
