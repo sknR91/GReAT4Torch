@@ -355,7 +355,7 @@ def svd_3x3(arg):
     a = 1
     b = -(d11 + d22 + d33)
     c = d11 * d22 + d11 * d33 + d22 * d33 - d23 * d23 - d12 * d12 - d13 * d13
-    d = -d11 * d22 * d33 + d11 * d21 * d23 + d12 * d12 * d33 - d12 * d23 * d13 - d13 * d12 * d23 + d13 * d13 * d22
+    d = -d11 * d22 * d33 + d11 * d23 * d23 + d12 * d12 * d33 - d12 * d23 * d13 - d13 * d12 * d23 + d13 * d13 * d22
 
     e1, e2, e3 = cardano(a, b, c, d)
     sings = np.sqrt(np.array([e1, e2, e3]))
