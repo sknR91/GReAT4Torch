@@ -28,7 +28,7 @@ def main():
     ####################################################################################################################
 
     # create registration and transformation objects and levels
-    registration = grt.GroupwiseRegistrationMultilevel(min_level=7, max_level=7, dtype=dtype, device=device)
+    registration = grt.GroupwiseRegistrationMultilevel(min_level=3, max_level=8, dtype=dtype, device=device)
     transformation = grt.NonParametricTransformation(m, num_imgs, dtype=dtype, device=device)
     registration.set_transformation_type(transformation)
 
@@ -42,13 +42,15 @@ def main():
 
     # create regularizer object and set alpha (regularization weight)
     regularizer = grt.CurvatureRegularizer(h)
-    regularizer.set_alpha(2e6)
+    regularizer.set_alpha(26e2)
     registration.set_regularizer(regularizer)
 
     # set optimizer and non-standard parameters (e.g., maximum iterations)
-    optimizer = torch.optim.Adam(transformation.parameters(), lr=0.02)
+    optimizer = torch.optim.Adamax(transformation.parameters(), lr=0.2)
     registration.set_optimizer(optimizer)
-    registration.set_max_iterations(350)
+    registration.set_max_iterations(100)
+    registration.set_adaptive_alpha(True, 10)
+    registration.set_adaptive_lr(True, 1 / 10)
     registration.set_print_info(True)
     registration.set_plot_progress(False)
 

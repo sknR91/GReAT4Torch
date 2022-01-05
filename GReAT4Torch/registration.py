@@ -108,6 +108,17 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
 
         self._min_level = min_level
         self._max_level = max_level
+        self._max_level_data = None
+        self._adaptive_alpha = False
+        self._adaptive_lr = False
+
+    def set_adaptive_alpha(self, flag, rate=50):
+        self._adaptive_alpha = flag
+        self._adaptive_alpha_rate = rate
+
+    def set_adaptive_lr(self, flag, rate=50):
+        self._adaptive_lr = flag
+        self._adaptive_lr_rate = rate
 
     def _driver(self):
         self._optimizer.zero_grad()
@@ -163,6 +174,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         max_level, image_size_level, num_pixels_level, max_level_data = \
             self._get_max_level_parameters(self._max_level, image_size)
         self._max_level = max_level
+        self._max_level_data = max_level_data
 
         data_ML = [None] * (max_level+1)
         m_ML = [None] * (max_level+1)
@@ -193,12 +205,13 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
     def start(self):
         self.set_images(self._distance_measure._images)
         images_levels, image_sizes_levels = self._compute_multilevel_data()
+        alpha = self._regularizer.get_alpha()
 
         print("=" * 30, " Starting multilevel groupwise image registration ", "=" * 30)
         print("-- Distance Measure: ", self._distance_measure.name)
         print("-- Regularizer: ", self._regularizer.name)
         print(f"-- Level(s): {self._min_level} to {self._max_level}")
-        print(f"-- Level of full resolution: {len(image_sizes_levels)} ({image_sizes_levels[-1][2:].tolist()})\n")
+        print(f"-- Level of full resolution: {self._max_level_data}\n")
 
         # iterate over all levels
         for level in range(self._min_level, self._max_level+1):
@@ -218,8 +231,14 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
             # fetch all attributes from the original optimizer to pass it to a freshly initialized instance
             optim_attributes = { _key : self._optimizer.param_groups[0][_key] for _key in self._optimizer.param_groups[0] }
             del optim_attributes['params']
+
+            # reduce learning rate or alpha for each higher level
             if level != self._min_level:
-                optim_attributes['lr'] = optim_attributes['lr'] / 2
+                if self._adaptive_lr:
+                    optim_attributes['lr'] *= self._adaptive_lr_rate
+                if self._adaptive_alpha:
+                    alpha *= self._adaptive_alpha_rate
+                    self._regularizer.set_alpha(alpha)
 
             # reinitialize the optimizer instance with new "params" and all pre-set attributes!
             self._optimizer.__init__(self._transformation_type.parameters(), **optim_attributes)

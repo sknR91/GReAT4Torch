@@ -154,9 +154,9 @@ class SqN(_Distance):
         Ic_n = Ic_n.permute((1, 2, 3, 0))
 
         rc, _, _, _ = self._sqnorm(Ic_n[0, 0, :, :], q)
-        # hd = hd * np.sqrt(nP)
-        # Dc = hd * rc
-        Dc = rc
+        hd = hd * np.sqrt(nP)
+        Dc = hd * rc
+        # Dc = rc
 
         return self.return_distance(-Dc)
 
@@ -297,8 +297,8 @@ class SqN_pointwise(_Distance):
         sq_values = self._sqnorm_pointwise(C[0, 0, ...], q)
 
         rc = torch.sum(sq_values)
-        # hd = hd * np.sqrt(nP)
-        # Dc = hd * rc
-        Dc = rc
+        hd = hd * np.sqrt(nP)
+        Dc = hd * rc
+        # Dc = rc
 
         return self.return_distance(-Dc)

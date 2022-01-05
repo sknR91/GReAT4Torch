@@ -17,6 +17,9 @@ class _Regularizer(torch.nn.modules.Module):
     def set_alpha(self, alpha):
         self._alpha = alpha
 
+    def get_alpha(self):
+        return self._alpha
+
     def return_regularizer(self, tensor):
         if self._size_average and self._reduce:
             return self._alpha * tensor.mean()
