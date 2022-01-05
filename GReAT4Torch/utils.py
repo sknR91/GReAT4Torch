@@ -338,11 +338,12 @@ def svd_2x2(arg):
 
     num_pixels = arg.size(0)
 
-    d = torch.sqrt(torch.max(torch.zeros(num_pixels), 0.25 * trace * trace - det))
+    eps = 1e-5
+    d = torch.sqrt(torch.max(torch.zeros(num_pixels), 0.25 * trace * trace - det) + eps)
     lmax = torch.max(torch.zeros(num_pixels), 0.5 * trace + d)
     lmin = torch.max(torch.zeros(num_pixels), 0.5 * trace - d)
-    smax = torch.sqrt(lmax)
-    smin = torch.sqrt(lmin)
+    smax = torch.sqrt(lmax + eps)
+    smin = torch.sqrt(lmin + eps)
 
     return smax, smin
 
@@ -363,7 +364,8 @@ def svd_3x3(arg):
     d = -d11 * d22 * d33 + d11 * d23 * d23 + d12 * d12 * d33 - d12 * d23 * d13 - d13 * d12 * d23 + d13 * d13 * d22
 
     e1, e2, e3 = cardano(a, b, c, d)
-    sings = torch.sqrt(torch.stack((e1, e2, e3)))
+    eps = 1e-5
+    sings = torch.sqrt(torch.stack((e1, e2, e3)) + eps)
 
     return sings[0, :], sings[1, :], sings[2, :]
 
@@ -383,9 +385,10 @@ def cardano(A, B, C, D):
     q = 2 * a * a * a / 27 - a * b / 3 + c
 
     discriminant = q * q / 4 + p * p * p / 27
+    eps = 1e-5
 
-    u = (-q / 2 + torch.sqrt(discriminant)) ** (1 / 3)
-    v = (-q / 2 - torch.sqrt(discriminant)) ** (1 / 3)
+    u = (-q / 2 + torch.sqrt(discriminant + eps)) ** (1 / 3)
+    v = (-q / 2 - torch.sqrt(discriminant + eps)) ** (1 / 3)
 
     eps1 = -1 / 2 + 1 / 2 * 1j * np.sqrt(3)
     eps2 = -1 / 2 - 1 / 2 * 1j * np.sqrt(3)
