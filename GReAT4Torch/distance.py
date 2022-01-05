@@ -1,12 +1,7 @@
 import torch
-import torch.nn.functional as F
 import numpy as np
-
-import GReAT4Torch
 from . import utils
-from . import plot
 from torch import nn
-import matplotlib.pyplot as plt
 
 class _Distance(torch.nn.modules.Module):
     def __init__(self, images, size_average=True, reduce=True):
@@ -159,9 +154,9 @@ class SqN(_Distance):
         Ic_n = Ic_n.permute((1, 2, 3, 0))
 
         rc, _, _, _ = self._sqnorm(Ic_n[0, 0, :, :], q)
-        hd = hd * np.sqrt(nP)
-        Dc = hd * rc
-        #Dc = rc
+        # hd = hd * np.sqrt(nP)
+        # Dc = hd * rc
+        Dc = rc
 
         return self.return_distance(-Dc)
 
@@ -279,26 +274,31 @@ class SqN_pointwise(_Distance):
         Ic_n = []
         nI = len(Ic_x)
 
-        for k in range(nP):
-            pixels_x = torch.stack(Ic_x).view(nI, num_batches, num_channels, -1).permute(perm_a)  ## batches x channels x pixels x images
-            pixels_y = torch.stack(Ic_y).view(nI, num_batches, num_channels, -1).permute(perm_a)
-            if dim == 3:
-                pixels_z = torch.stack(Ic_z).view(nI, num_batches, num_channels, -1).permute(perm_a)
+        pixels_x = torch.stack(Ic_x).view(nI, num_batches, num_channels, -1).permute(perm_a)  ## batches x channels x pixels x images
+        pixels_y = torch.stack(Ic_y).view(nI, num_batches, num_channels, -1).permute(perm_a)
+        if dim == 3:
+            pixels_z = torch.stack(Ic_z).view(nI, num_batches, num_channels, -1).permute(perm_a)
 
-            if dim == 2:
-                Ic_normalized = torch.stack((pixels_x, pixels_y)).permute(perm_b) ## bacthes x channels x pixels x images x dimensions
-            elif dim == 3:
-                Ic_normalized = torch.stack((pixels_x, pixels_y, pixels_z)).permute(perm_b)
+        if dim == 2:
+            Ic_normalized = torch.stack((pixels_x, pixels_y)).permute(perm_b) ## bacthes x channels x pixels x images x dimensions
+        elif dim == 3:
+            Ic_normalized = torch.stack((pixels_x, pixels_y, pixels_z)).permute(perm_b)
 
-            Ic_n.append(torch.matmul(torch.transpose(Ic_normalized[..., k, :, :], 2, 3),
-                                     Ic_normalized[..., k, :, :]))
+        # for k in range(nP):
+        #     Ic_n.append(torch.matmul(torch.transpose(Ic_normalized[..., k, :, :], 2, 3),
+        #                              Ic_normalized[..., k, :, :]))
+        # C = torch.stack(Ic_n).view(num_batches, num_channels, nP, -1)  # entries of covariance matrix; num_pixels x num_entries_C
 
-        C = torch.stack(Ic_n).view(num_batches, num_channels, nP, -1)  # entries of covariance matrix; num_pixels x num_entries_C
+        ## avoid looping over all pixels ################
+        Ic_nn = torch.einsum('ijklm,ijkde->ijkle', torch.transpose(Ic_normalized, 3, 4), Ic_normalized)
+        C = Ic_nn.view(num_batches, num_channels, nP, -1)
+        #################################
+
         sq_values = self._sqnorm_pointwise(C[0, 0, ...], q)
 
         rc = torch.sum(sq_values)
-        hd = hd * np.sqrt(nP)
-        #Dc = hd * rc
+        # hd = hd * np.sqrt(nP)
+        # Dc = hd * rc
         Dc = rc
 
         return self.return_distance(-Dc)
