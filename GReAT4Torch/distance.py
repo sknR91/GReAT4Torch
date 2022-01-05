@@ -1,6 +1,8 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
+
+import GReAT4Torch
 from . import utils
 from . import plot
 from torch import nn
@@ -133,30 +135,6 @@ class SqN(_Distance):
     def forward(self, displacement):
         self.warped_images = utils.warp_images(images=self._images, displacement=displacement)
 
-        if False:
-            f = plt.figure(1)
-            f.clf()
-            plt.subplot(231)
-            plt.imshow(self.warped_images[0].cpu().squeeze().detach().numpy())
-            plt.subplot(232)
-            plt.imshow(self.warped_images[1].cpu().squeeze().detach().numpy())
-            plt.subplot(233)
-            plt.imshow(self.warped_images[2].cpu().squeeze().detach().numpy())
-            plt.subplot(234)
-            theta = utils.param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
-                                                   device=self._images[0].device).unsqueeze(0).float(),
-                                      displacement.size(2), displacement.size(3))
-            id = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
-            plot.plot_grid_2d(
-                id[0, ...].cpu().detach().numpy() + displacement[0, ...].permute(1, 2, 0).cpu().detach().numpy(), )
-            plt.subplot(235)
-            plot.plot_grid_2d(
-                id[0, ...].cpu().detach().numpy() + displacement[1, ...].permute(1, 2, 0).cpu().detach().numpy(), )
-            plt.subplot(236)
-            plot.plot_grid_2d(
-                id[0, ...].cpu().detach().numpy() + displacement[2, ...].permute(1, 2, 0).cpu().detach().numpy(), )
-            plt.pause(0.001)
-
         m = self._m
         dim = self._dim
         num_batches = m[0]
@@ -184,5 +162,142 @@ class SqN(_Distance):
         hd = hd * np.sqrt(nP)
         Dc = hd * rc
         #Dc = rc
+
+        return self.return_distance(-Dc)
+
+class SqN_pointwise(_Distance):
+    def __init__(self, images, size_average=True, reduce=True):
+        super(SqN_pointwise, self).__init__(images, size_average, reduce)
+
+        self.name = "sqn_pointwise"
+        self._images = images
+        self.warped_images = None
+        self.edge = 1e-3
+        self.normalize = 'local'
+        self.q = 4
+
+    def set_edge_parameter(self, edge):
+        self.edge = edge
+
+    def set_normalization_method(self, normalize):
+        self.normalize = normalize
+
+    def set_q_parameter(self, q):
+        self.q = q
+
+    def _normalized_gradients(self, Ic, edge=1e-3, h=None, normalize='local'):
+        m = Ic[0].size()
+        dim = len(m[2:])
+        B = m[0]
+        C = m[1]
+
+        if dim == 2:
+            conv_x = nn.Conv2d(in_channels=C, out_channels=C, kernel_size=[2, 1], bias=False, groups=C)
+            conv_y = nn.Conv2d(in_channels=C, out_channels=C, kernel_size=[1, 2], bias=False, groups=C)
+            conv_x.weight.requires_grad = False
+            conv_y.weight.requires_grad = False
+
+            conv_x.weight.data = torch.Tensor([0.5, 0.5]).view(1, 1, 2, 1).repeat(C, 1, 1, 1)
+            conv_y.weight.data = torch.Tensor([0.5, 0.5]).view(1, 1, 1, 2).repeat(C, 1, 1, 1)
+        elif dim == 3:
+            conv_x = nn.Conv3d(in_channels=C, out_channels=C, kernel_size=[2, 1, 1], bias=False, groups=C)
+            conv_y = nn.Conv3d(in_channels=C, out_channels=C, kernel_size=[1, 2, 1], bias=False, groups=C)
+            conv_z = nn.Conv3d(in_channels=C, out_channels=C, kernel_size=[1, 1, 2], bias=False, groups=C)
+            conv_x.weight.requires_grad = False
+            conv_y.weight.requires_grad = False
+            conv_z.weight.requires_grad = False
+
+            conv_x.weight.data = torch.Tensor([0.5, 0.5]).view(1, 1, 2, 1, 1).repeat(C, 1, 1, 1, 1)
+            conv_y.weight.data = torch.Tensor([0.5, 0.5]).view(1, 1, 1, 2, 1).repeat(C, 1, 1, 1, 1)
+            conv_z.weight.data = torch.Tensor([0.5, 0.5]).view(1, 1, 1, 1, 2).repeat(C, 1, 1, 1, 1)
+
+        Ic_x = []; Ic_y = []; Ic_z = []
+        for k in range(len(Ic)):
+            if dim == 2:
+                tmp_x, tmp_y = utils.grad2d(Ic[k], h)
+            elif dim == 3:
+                tmp_x, tmp_y, tmp_z = utils.grad3d(Ic[k], h)
+                Ic_z.append(conv_z(tmp_z))
+            Ic_x.append(conv_x(tmp_x))
+            Ic_y.append(conv_y(tmp_y))
+
+        normIc_x = []; normIc_y = []; normIc_z = []
+        for k in range(len(Ic)):
+            if normalize == 'local':
+                if dim == 2:
+                    prod = torch.sqrt(Ic_x[k] * Ic_x[k] + Ic_y[k] * Ic_y[k] + edge ** 2)
+                elif dim == 3:
+                    prod = torch.sqrt(Ic_x[k] * Ic_x[k] + Ic_y[k] * Ic_y[k] + Ic_z[k] * Ic_z[k] + edge ** 2)
+            else:
+                if dim == 2:
+                    prod = torch.sqrt(torch.sum(Ic_x[k] * Ic_x[k] + Ic_y[k] * Ic_y[k]) + edge ** 2)
+                elif dim == 3:
+                    prod = torch.sqrt(torch.sum(Ic_x[k] * Ic_x[k] + Ic_y[k] * Ic_y[k] + Ic_z[k] * Ic_z[k]) + edge ** 2)
+            normIc_x.append(Ic_x[k] / prod)
+            normIc_y.append(Ic_y[k] / prod)
+            if dim == 3:
+                normIc_z.append(Ic_z[k] / prod)
+
+        return normIc_x, normIc_y, normIc_z
+
+    def _sqnorm_pointwise(self, C, q):
+
+        dim = self._dim
+
+        if dim == 2:
+            smax, smin = utils.svd_2x2(C)
+            S = torch.stack((smax, smin))
+        elif dim == 3:
+            smax, smed, smin = utils.svd_3x3(C)
+            S = torch.stack((smax, smed, smin))
+
+        vals = torch.sum(S ** q, dim=0) ** (1 / q)
+
+        return vals
+
+    def forward(self, displacement):
+        self.warped_images = utils.warp_images(images=self._images, displacement=displacement)
+
+        m = self._m
+        dim = self._dim
+        num_batches = m[0]
+        num_channels = m[1]
+        h = self._h
+        q = self.q
+
+        nP = self._images[0].numel()
+        hd = torch.prod(h)
+        if dim == 2:
+            perm_a = np.roll(range(dim + 2), -1).tolist()
+            perm_b = np.roll(range(dim + 3), -1).tolist()
+        elif dim == 3:
+            perm_a = np.roll(range(dim + 1), -1).tolist()
+            perm_b = np.roll(range(dim + 2), -1).tolist()
+
+        Ic_x, Ic_y, Ic_z = self._normalized_gradients(self.warped_images, self.edge, self._h, self.normalize)
+        Ic_n = []
+        nI = len(Ic_x)
+
+        for k in range(nP):
+            pixels_x = torch.stack(Ic_x).view(nI, num_batches, num_channels, -1).permute(perm_a)  ## batches x channels x pixels x images
+            pixels_y = torch.stack(Ic_y).view(nI, num_batches, num_channels, -1).permute(perm_a)
+            if dim == 3:
+                pixels_z = torch.stack(Ic_z).view(nI, num_batches, num_channels, -1).permute(perm_a)
+
+            if dim == 2:
+                Ic_normalized = torch.stack((pixels_x, pixels_y)).permute(perm_b) ## bacthes x channels x pixels x images x dimensions
+            elif dim == 3:
+                Ic_normalized = torch.stack((pixels_x, pixels_y, pixels_z)).permute(perm_b)
+
+            Ic_n.append(torch.matmul(torch.transpose(Ic_normalized[..., k, :, :], 2, 3),
+                                     Ic_normalized[..., k, :, :]))
+
+        C = torch.stack(Ic_n).view(num_batches, num_channels, nP, -1)  # entries of covariance matrix; num_pixels x num_entries_C
+        sq_values = self._sqnorm_pointwise(C[0, 0, ...], q)
+
+        rc = torch.sum(sq_values)
+        hd = hd * np.sqrt(nP)
+        #Dc = hd * rc
+        Dc = rc
 
         return self.return_distance(-Dc)

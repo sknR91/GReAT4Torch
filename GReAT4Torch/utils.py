@@ -5,6 +5,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import warnings
+import GReAT4Torch
 
 warnings.filterwarnings("ignore")
 
@@ -327,15 +328,19 @@ def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=Fals
 
 
 def svd_2x2(arg):
-    d11 = arg[:, 0] * arg[:, 0] + arg[:, 2] * arg[:, 2]
-    d12 = arg[:, 0] * arg[:, 1] + arg[:, 2] * arg[:, 3] # = d21
-    d22 = arg[:, 1] * arg[:, 1] + arg[:, 3] * arg[:, 3]
+    # counting row first
+    d11 = arg[:, 0] * arg[:, 0] + arg[:, 1] * arg[:, 1]
+    d12 = arg[:, 0] * arg[:, 2] + arg[:, 1] * arg[:, 3] # = d21
+    d22 = arg[:, 2] * arg[:, 2] + arg[:, 3] * arg[:, 3]
 
     trace = d11 + d22
     det = d11 * d22 - d12 * d12
-    d = torch.sqrt(torch.max(torch.tensor([0, 0.25 * trace * trace - det])))
-    lmax = torch.max(torch.tensor(0, 0.5 * trace + d))
-    lmin = torch.min(torch.tensor(0, 0.5 * trace - d))
+
+    num_pixels = arg.size(0)
+
+    d = torch.sqrt(torch.max(torch.zeros(num_pixels), 0.25 * trace * trace - det))
+    lmax = torch.max(torch.zeros(num_pixels), 0.5 * trace + d)
+    lmin = torch.max(torch.zeros(num_pixels), 0.5 * trace - d)
     smax = torch.sqrt(lmax)
     smin = torch.sqrt(lmin)
 
@@ -343,13 +348,13 @@ def svd_2x2(arg):
 
 
 def svd_3x3(arg):
-    # compute entries of matrx arg.T * arg
-    d11 = arg[:, 0] * arg[:, 0] + arg[:, 3] * arg[0, 3] + arg[0, 6] * arg[0, 6]
-    d22 = arg[:, 1] * arg[:, 1] + arg[:, 4] * arg[0, 4] + arg[0, 7] * arg[0, 7]
-    d33 = arg[:, 2] * arg[:, 2] + arg[:, 5] * arg[0, 5] + arg[0, 8] * arg[0, 8]
-    d12 = arg[:, 0] * arg[:, 1] + arg[:, 3] * arg[:, 4] + arg[:, 6] * arg[:, 7]  # = d21
-    d13 = arg[:, 0] * arg[:, 2] + arg[:, 3] * arg[:, 5] + arg[:, 6] * arg[:, 8]  # = d31
-    d23 = arg[:, 1] * arg[:, 2] + arg[:, 4] * arg[:, 5] + arg[:, 7] * arg[:, 8]  # = d32
+    # compute entries of matrx arg.T * arg (counting is row first)
+    d11 = arg[:, 0] * arg[:, 0] + arg[:, 1] * arg[0, 1] + arg[0, 2] * arg[0, 2]
+    d22 = arg[:, 3] * arg[:, 3] + arg[:, 4] * arg[0, 4] + arg[0, 5] * arg[0, 5]
+    d33 = arg[:, 6] * arg[:, 6] + arg[:, 7] * arg[0, 7] + arg[0, 8] * arg[0, 8]
+    d12 = arg[:, 0] * arg[:, 3] + arg[:, 1] * arg[:, 4] + arg[:, 2] * arg[:, 5]  # = d21
+    d13 = arg[:, 0] * arg[:, 6] + arg[:, 1] * arg[:, 7] + arg[:, 2] * arg[:, 8]  # = d31
+    d23 = arg[:, 3] * arg[:, 6] + arg[:, 4] * arg[:, 7] + arg[:, 5] * arg[:, 8]  # = d32
 
     # compute coefficients of characteristic polynomial
     a = 1
@@ -358,9 +363,9 @@ def svd_3x3(arg):
     d = -d11 * d22 * d33 + d11 * d23 * d23 + d12 * d12 * d33 - d12 * d23 * d13 - d13 * d12 * d23 + d13 * d13 * d22
 
     e1, e2, e3 = cardano(a, b, c, d)
-    sings = np.sqrt(np.array([e1, e2, e3]))
+    sings = torch.sqrt(torch.stack((e1, e2, e3)))
 
-    return sings[0], sings[1], sings[2]
+    return sings[0, :], sings[1, :], sings[2, :]
 
 
 def cardano(A, B, C, D):
@@ -379,8 +384,8 @@ def cardano(A, B, C, D):
 
     discriminant = q * q / 4 + p * p * p / 27
 
-    u = (-q / 2 + np.sqrt(discriminant)) ** (1 / 3)
-    v = (-q / 2 - np.sqrt(discriminant)) ** (1 / 3)
+    u = (-q / 2 + torch.sqrt(discriminant)) ** (1 / 3)
+    v = (-q / 2 - torch.sqrt(discriminant)) ** (1 / 3)
 
     eps1 = -1 / 2 + 1 / 2 * 1j * np.sqrt(3)
     eps2 = -1 / 2 - 1 / 2 * 1j * np.sqrt(3)
@@ -396,3 +401,54 @@ def cardano(A, B, C, D):
     x3 = z3 - a / 3
 
     return x1, x2, x3
+
+
+def plot_progress(images, displacement):
+    dim = len(images[0].size())-2
+    pplt = GReAT4Torch.plot()
+    f = plt.figure(1)
+    f.clf()
+    num_imgs = len(images)
+
+    if dim == 2:
+        if num_imgs == 2:
+            sbplt = 220
+        elif num_imgs > 2:
+            sbplt = 230
+    elif dim == 3:
+        if num_imgs == 2:
+            sbplt = 120
+        elif num_imgs > 2:
+            sbplt = 130
+
+    if dim == 2:
+        plt.subplot(sbplt+1)
+        plt.imshow(images[0].cpu().squeeze().detach().numpy())
+        plt.subplot(sbplt+2)
+        plt.imshow(images[1].cpu().squeeze().detach().numpy())
+        if num_imgs > 2:
+            plt.subplot(sbplt+3)
+            plt.imshow(images[2].cpu().squeeze().detach().numpy())
+        plt.subplot(sbplt+4)
+        theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]]).unsqueeze(0).float(),
+                                  displacement.size(2), displacement.size(3))
+        ident = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
+        pplt.plot_grid_2d(
+            ident[0, ...].cpu().detach().numpy() + displacement[0, ...].permute(1, 2, 0).cpu().detach().numpy(), )
+        plt.subplot(sbplt+5)
+        pplt.plot_grid_2d(
+            ident[0, ...].cpu().detach().numpy() + displacement[1, ...].permute(1, 2, 0).cpu().detach().numpy(), )
+        if num_imgs > 2:
+            plt.subplot(sbplt+6)
+            pplt.plot_grid_2d(
+                ident[0, ...].cpu().detach().numpy() + displacement[2, ...].permute(1, 2, 0).cpu().detach().numpy(), )
+        plt.pause(0.001)
+    elif dim == 3:
+        n = images[0].size()[0]/2
+        plt.subplot(sbplt+1)
+        plt.imshow(images[0][n.int(), ...].cpu().squeeze().detach().numpy())
+        plt.subplot(sbplt+2)
+        plt.imshow(images[1][n.int(), ...].cpu().squeeze().detach().numpy())
+        if num_imgs > 2:
+            plt.subplot(sbplt+3)
+            plt.imshow(images[2][n.int(), ...].cpu().squeeze().detach().numpy())

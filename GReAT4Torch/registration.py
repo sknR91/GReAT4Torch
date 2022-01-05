@@ -2,6 +2,8 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 from . import utils
+import GReAT4Torch
+import matplotlib.pyplot as plt
 
 class _Registration():
     def __init__(self, dtype=torch.float32, device='cpu'):
@@ -24,8 +26,9 @@ class _Registration():
         # set transformation type
         self._transformation_type = None
 
-        # set flag for printing iteration information
+        # set flag for printing iteration information and plotting the progress
         self._print_info = True
+        self._plot_progress = False
 
     def set_distance_measure(self, distance):
         self._distance_measure = distance
@@ -45,6 +48,9 @@ class _Registration():
     def set_print_info(self, flag):
         self._print_info = flag
 
+    def set_plot_progress(self, flag):
+        self._plot_progress = flag
+
 class _GroupwiseRegistration(_Registration):
     def __init__(self, dtype=torch.float32, device='cpu'):
         super(_GroupwiseRegistration, self).__init__(dtype, device)
@@ -62,6 +68,9 @@ class GroupwiseRegistration(_GroupwiseRegistration):
     def _driver(self):
         self._optimizer.zero_grad()
         displacement = self._transformation_type()
+
+        if self._plot_progress:
+            utils.plot_progress(utils.warp_images(self._images, displacement), displacement)
 
         # compute distance between images
         dist = self._distance_measure(displacement)
@@ -104,6 +113,9 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         self._optimizer.zero_grad()
         displacement = self._transformation_type()
 
+        if self._plot_progress:
+            utils.plot_progress(utils.warp_images(self._images, displacement), displacement)
+
         # compute distance between images
         dist = self._distance_measure(displacement)
 
@@ -120,7 +132,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         if self._print_info:
             print(f"distance + regularizer = objective: {dist} + {regul} = {obj}")
 
-        obj.backward()
+        obj.backward(retain_graph=True)
 
         return obj
 
@@ -207,7 +219,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
             optim_attributes = { _key : self._optimizer.param_groups[0][_key] for _key in self._optimizer.param_groups[0] }
             del optim_attributes['params']
             if level != self._min_level:
-                optim_attributes['lr'] = optim_attributes['lr'] / 10
+                optim_attributes['lr'] = optim_attributes['lr'] / 2
 
             # reinitialize the optimizer instance with new "params" and all pre-set attributes!
             self._optimizer.__init__(self._transformation_type.parameters(), **optim_attributes)

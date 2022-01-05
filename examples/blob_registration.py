@@ -14,19 +14,6 @@ def main():
     dtype = torch.float32
     device = torch.device('cpu')
 
-    ######## create blob data using numpy based GReAT-tools ############################################################
-    #A = tools.compute_ball(np.array([160, 160, 160]), 20, np.array([80, 80, 80]))
-    #B = tools.compute_ball(np.array([160, 160, 160]), 35, np.array([80, 80, 80]))
-    #C = tools.compute_ball(np.array([160, 160, 160]), 45, np.array([80, 80, 80]))
-
-    #Ic = [torch.Tensor(A).to(device).unsqueeze(0).unsqueeze(0), torch.Tensor(B).to(device).unsqueeze(0).unsqueeze(0),
-    #      torch.Tensor(C).to(device).unsqueeze(0).unsqueeze(0)]
-    #m = Ic[0].size()
-    #num_imgs = len(Ic)
-    #dim = 3
-    #h = torch.ones(1, dim)
-    ####################################################################################################################
-
     ######## create circle data using numpy based GReAT-tools ##########################################################
     A = grt.compute_circle(np.array([400, 400]), 100, np.array([200, 200]))
     B = grt.compute_circle(np.array([400, 400]), 100, np.array([250, 220]))
@@ -49,19 +36,21 @@ def main():
     distance_measure = grt.SqN(Ic)
     distance_measure.set_normalization_method('local')
     distance_measure.set_q_parameter(4)
-    distance_measure.set_edge_parameter(1e1)
+    distance_measure.set_edge_parameter(25)
     # distance_measure.set_distance_weight(1e-2)
     registration.set_distance_measure(distance_measure)
 
     # create regularizer object and set alpha (regularization weight)
     regularizer = grt.CurvatureRegularizer(h)
-    regularizer.set_alpha(1e4)
+    regularizer.set_alpha(8e3)
     registration.set_regularizer(regularizer)
 
     # set optimizer and non-standard parameters (e.g., maximum iterations)
-    optimizer = torch.optim.Adamax(transformation.parameters(), lr=0.2)
+    optimizer = torch.optim.Adam(transformation.parameters(), lr=0.02)
     registration.set_optimizer(optimizer)
     registration.set_max_iterations(150)
+    registration.set_print_info(True)
+    registration.set_plot_progress(True)
 
     ######## start the registration ####################################################################################
     registration.start()
