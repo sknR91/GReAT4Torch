@@ -15,9 +15,9 @@ def main():
     device = torch.device('cpu')
 
     ######## create blob data using numpy based GReAT-tools ############################################################
-    A = grt.compute_ball(np.array([160, 160, 160]), 20, np.array([80, 80, 80]))
+    A = grt.compute_ball(np.array([160, 160, 160]), 20, np.array([50, 50, 80]))
     B = grt.compute_ball(np.array([160, 160, 160]), 25, np.array([80, 80, 80]))
-    C = grt.compute_ball(np.array([160, 160, 160]), 30, np.array([80, 80, 80]))
+    C = grt.compute_ball(np.array([160, 160, 160]), 30, np.array([40, 90, 80]))
 
     Ic = [torch.Tensor(A).to(device).unsqueeze(0).unsqueeze(0), torch.Tensor(B).to(device).unsqueeze(0).unsqueeze(0),
           torch.Tensor(C).to(device).unsqueeze(0).unsqueeze(0)]
