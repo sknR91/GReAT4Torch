@@ -238,6 +238,7 @@ class SqN_pointwise(_Distance):
     def _sqnorm_pointwise(self, C, q):
 
         dim = self._dim
+        eps = 1e-5
 
         if dim == 2:
             smax, smin = utils.svd_2x2(C)
@@ -246,7 +247,6 @@ class SqN_pointwise(_Distance):
             smax, smed, smin = utils.svd_3x3(C)
             S = torch.stack((smax, smed, smin))
 
-        eps = 1e-5
         vals = (torch.sum(S ** q, dim=0) + eps) ** (1 / q)
 
         return vals

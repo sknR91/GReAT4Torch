@@ -350,9 +350,9 @@ def svd_2x2(arg):
 
 def svd_3x3(arg):
     # compute entries of matrx arg.T * arg (counting is row first)
-    d11 = arg[:, 0] * arg[:, 0] + arg[:, 1] * arg[0, 1] + arg[0, 2] * arg[0, 2]
-    d22 = arg[:, 3] * arg[:, 3] + arg[:, 4] * arg[0, 4] + arg[0, 5] * arg[0, 5]
-    d33 = arg[:, 6] * arg[:, 6] + arg[:, 7] * arg[0, 7] + arg[0, 8] * arg[0, 8]
+    d11 = arg[:, 0] * arg[:, 0] + arg[:, 1] * arg[:, 1] + arg[:, 2] * arg[:, 2]
+    d22 = arg[:, 3] * arg[:, 3] + arg[:, 4] * arg[:, 4] + arg[:, 5] * arg[:, 5]
+    d33 = arg[:, 6] * arg[:, 6] + arg[:, 7] * arg[:, 7] + arg[:, 8] * arg[:, 8]
     d12 = arg[:, 0] * arg[:, 3] + arg[:, 1] * arg[:, 4] + arg[:, 2] * arg[:, 5]  # = d21
     d13 = arg[:, 0] * arg[:, 6] + arg[:, 1] * arg[:, 7] + arg[:, 2] * arg[:, 8]  # = d31
     d23 = arg[:, 3] * arg[:, 6] + arg[:, 4] * arg[:, 7] + arg[:, 5] * arg[:, 8]  # = d32
@@ -364,8 +364,9 @@ def svd_3x3(arg):
     d = -d11 * d22 * d33 + d11 * d23 * d23 + d12 * d12 * d33 - d12 * d23 * d13 - d13 * d12 * d23 + d13 * d13 * d22
 
     e1, e2, e3 = cardano(a, b, c, d)
+
     eps = 1e-5
-    sings = torch.sqrt(torch.stack((e1, e2, e3)) + eps)
+    sings = torch.sqrt(torch.stack((abs(e1), abs(e2), abs(e3))) + eps)
 
     return sings[0, :], sings[1, :], sings[2, :]
 
@@ -384,19 +385,27 @@ def cardano(A, B, C, D):
     p = b - a * a / 3
     q = 2 * a * a * a / 27 - a * b / 3 + c
 
-    discriminant = q * q / 4 + p * p * p / 27
     eps = 1e-5
+    num_pixels = B.size(0)
+    discriminant = q * q / 4 + p * p * p / 27
 
-    u = (-q / 2 + torch.sqrt(discriminant + eps)) ** (1 / 3)
-    v = (-q / 2 - torch.sqrt(discriminant + eps)) ** (1 / 3)
+    d = torch.sqrt(torch.max(torch.zeros(num_pixels), discriminant) + eps)
+    u = torch.max(torch.zeros(num_pixels), -0.5 * q + d)
+    v = torch.max(torch.zeros(num_pixels), -0.5 * q - d)
+    u = (u + eps) ** (1 / 3)
+    v = (v + eps) ** (1 / 3)
 
-    eps1 = -1 / 2 + 1 / 2 * 1j * np.sqrt(3)
-    eps2 = -1 / 2 - 1 / 2 * 1j * np.sqrt(3)
+    eps1 = -0.5 + 0.5 * 1j * np.sqrt(3)
+    eps2 = -0.5 - 0.5 * 1j * np.sqrt(3)
 
     # substitutional solutions
     z1 = u + v
     z2 = u * eps1 + v * eps2
     z3 = u * eps2 + v * eps1
+
+    # z1 = torch.nan_to_num(z1)
+    # z2 = torch.nan_to_num(torch.real(z2))
+    # z3 = torch.nan_to_num(torch.real(z3))
 
     # resubstitution
     x1 = z1 - a / 3
@@ -447,11 +456,12 @@ def plot_progress(images, displacement):
                 ident[0, ...].cpu().detach().numpy() + displacement[2, ...].permute(1, 2, 0).cpu().detach().numpy(), )
         plt.pause(0.001)
     elif dim == 3:
-        n = images[0].size()[0]/2
+        n = images[0].size()[2]/2
         plt.subplot(sbplt+1)
-        plt.imshow(images[0][n.int(), ...].cpu().squeeze().detach().numpy())
+        plt.imshow(images[0].squeeze()[..., int(n)].cpu().squeeze().detach().numpy())
         plt.subplot(sbplt+2)
-        plt.imshow(images[1][n.int(), ...].cpu().squeeze().detach().numpy())
+        plt.imshow(images[1].squeeze()[..., int(n)].cpu().squeeze().detach().numpy())
         if num_imgs > 2:
             plt.subplot(sbplt+3)
-            plt.imshow(images[2][n.int(), ...].cpu().squeeze().detach().numpy())
+            plt.imshow(images[2].squeeze()[..., int(n)].cpu().squeeze().detach().numpy())
+        plt.pause(0.001)

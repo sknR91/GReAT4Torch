@@ -28,12 +28,12 @@ def main():
     ####################################################################################################################
 
     # create registration and transformation objects and levels
-    registration = grt.GroupwiseRegistrationMultilevel(min_level=3, max_level=7, dtype=dtype, device=device)
+    registration = grt.GroupwiseRegistrationMultilevel(min_level=4, max_level=6, dtype=dtype, device=device)
     transformation = grt.NonParametricTransformation(m, num_imgs, dtype=dtype, device=device)
     registration.set_transformation_type(transformation)
 
     # create distance object and set non-standard parameters
-    distance_measure = grt.SqN(Ic)
+    distance_measure = grt.SqN_pointwise(Ic)
     distance_measure.set_normalization_method('local')
     distance_measure.set_q_parameter(4)
     distance_measure.set_edge_parameter(1e1)
@@ -42,13 +42,17 @@ def main():
 
     # create regularizer object and set alpha (regularization weight)
     regularizer = grt.CurvatureRegularizer(h)
-    regularizer.set_alpha(1e3)
+    regularizer.set_alpha(26e4)
     registration.set_regularizer(regularizer)
 
     # set optimizer and non-standard parameters (e.g., maximum iterations)
-    optimizer = torch.optim.Adamax(transformation.parameters(), lr=0.27)
+    optimizer = torch.optim.Adamax(transformation.parameters(), lr=0.2)
     registration.set_optimizer(optimizer)
-    registration.set_max_iterations(15)
+    registration.set_max_iterations(100)
+    registration.set_adaptive_alpha(True, 10)
+    registration.set_adaptive_lr(True, 1 / 10)
+    registration.set_print_info(True)
+    registration.set_plot_progress(False)
 
     ######## start the registration ####################################################################################
     registration.start()
