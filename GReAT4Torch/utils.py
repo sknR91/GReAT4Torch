@@ -6,6 +6,8 @@ import os
 import matplotlib.pyplot as plt
 import warnings
 import GReAT4Torch
+import nibabel as nib
+import scipy.interpolate as inter
 
 warnings.filterwarnings("ignore")
 
@@ -148,6 +150,68 @@ def param2theta3(param, d, w, h):
     theta[:, 2, 3] = param[:, 2, 3] * 2 / h + param[:, 2, 2] + theta[:, 2, 1] + theta[:, 2, 0] - 1
 
     return theta
+
+
+def normalize_displacement(u, dtype=torch.float32, device=torch.device('cpu')):
+    # voxel grid to pytorch grid
+    m = u.size()
+    dim = len(m[2:])
+
+    if dim == 2:
+        batches, channels, h, w = u.size()
+    elif dim == 3:
+        batches, channels, d, h, w = u.size()
+
+    scale = torch.ones(u.size(), dtype=dtype, device=device)
+    if dim ==2:
+        scale[:, 0, :, :] = scale[:, 0, :, :] / (h - 1) / 2
+        scale[:, 1, :, :] = scale[:, 1, :, :] / (w - 1) / 2
+    elif dim == 3:
+        scale[:, 0, :, :, :] = scale[:, 0, :, :, :] / (d - 1) / 2
+        scale[:, 1, :, :, :] = scale[:, 1, :, :, :] / (h - 1) / 2
+        scale[:, 2, :, :, :] = scale[:, 2, :, :, :] / (w - 1) / 2
+
+    return (u*scale).to(device)
+
+
+def denormalize_displacement(u, omega=None, shift=False, dtype=torch.float32, device=torch.device('cpu')):
+    # pytorch grid to voxel grid
+    m = u.size()
+    dim = len(m[2:])
+
+    if dim == 2:
+        batches, channels, h, w = u.size()
+    elif dim == 3:
+        batches, channels, d, h, w = u.size()
+
+    if omega is not None:
+        h = omega[3]
+        w = omega[1]
+        if dim == 3:
+            d = omega[5]
+
+    if shift:
+        u += 1
+        scale_h = h / 2
+        scale_w = w / 2
+        if dim == 3:
+            scale_d = d / 2
+    else:
+        scale_h = (h - 1) / 2
+        scale_w = (w - 1) / 2
+        if dim == 3:
+            scale_d = (d - 1) / 2
+
+    scale = torch.ones(u.size(), dtype=dtype, device=device)
+    if dim ==2:
+        scale[:, 0, :, :] = scale[:, 0, :, :] * scale_h
+        scale[:, 1, :, :] = scale[:, 1, :, :] * scale_w
+    elif dim == 3:
+        scale[:, 0, :, :, :] = scale[:, 0, :, :, :] * scale_d
+        scale[:, 1, :, :, :] = scale[:, 1, :, :, :] * scale_h
+        scale[:, 2, :, :, :] = scale[:, 2, :, :, :] * scale_w
+
+    return (u*scale).to(device)
 
 
 def grad3d(img, h=None):
@@ -327,6 +391,26 @@ def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=Fals
     return imagelist
 
 
+def read_nii(path, dtype=torch.float32, device=torch.device('cpu')):
+    data = nib.load(path)
+    m = np.array(data.shape)
+    dim = data.ndim
+    hdr = data.header
+    h = np.array(hdr['pixdim'][1:dim+1]) # 0 is left out intentionally!
+    omega = get_omega(m, h)
+
+    k = m[-1]
+    images = torch.tensor(data.get_fdata(), dtype=dtype, device=device)
+    images_list = []
+    for k in range(k):
+        images_list.append(images[..., k].unsqueeze(0).unsqueeze(0))
+
+    m = np.append([1, 1], m)
+    h = torch.ones(1, dim) * torch.tensor(h)
+
+    return images_list, torch.tensor(omega), torch.tensor(m), h
+
+
 def svd_2x2(arg):
     # counting row first
     d11 = arg[:, 0] * arg[:, 0] + arg[:, 1] * arg[:, 1]
@@ -456,7 +540,7 @@ def plot_progress(images, displacement):
                 ident[0, ...].cpu().detach().numpy() + displacement[2, ...].permute(1, 2, 0).cpu().detach().numpy(), )
         plt.pause(0.001)
     elif dim == 3:
-        n = images[0].size()[2]/2
+        n = images[0].size()[-1]/2
         plt.subplot(sbplt+1)
         plt.imshow(images[0].squeeze()[..., int(n)].cpu().squeeze().detach().numpy())
         plt.subplot(sbplt+2)
@@ -465,3 +549,79 @@ def plot_progress(images, displacement):
             plt.subplot(sbplt+3)
             plt.imshow(images[2].squeeze()[..., int(n)].cpu().squeeze().detach().numpy())
         plt.pause(0.001)
+
+
+def landmark_transform(landmarks, displacement, omega, m):
+    num_landmarks = landmarks.shape[0]
+    dim = landmarks.shape[1]
+    m = m[2:]
+
+    if displacement is None:
+        m_displacement = np.append(dim, m).tolist()
+        displacement = torch.zeros(m_displacement).unsqueeze(0)
+
+    if dim == 2:
+        theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]],
+                                         device=displacement[0, ...].device).unsqueeze(0).float(),
+                            m[0], m[1])
+    elif dim == 3:
+        theta = param2theta3(torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]],
+                                          device=displacement[0, ...].device).unsqueeze(0).float(),
+                             m[2], m[0], m[1])
+    identity = F.affine_grid(theta, ([1, dim] + m.tolist()), align_corners=True).squeeze()
+
+    identity = denormalize_displacement(identity.permute(2, 0, 1).unsqueeze(0),
+                                    shift=True, omega=omega).squeeze().permute(1,2,0)
+
+    grid = identity + displacement.squeeze().permute(1, 2, 0)
+    deform = displacement.squeeze().permute(1, 2, 0)
+    #F_inter = lambda z: z + inter.griddata(deform[...,0].numpy().flatten('F'),
+    #                             deform[...,1].numpy().flatten('F'),
+    #                             z, fill_value=0, method='linear')
+
+    ############ might be problematic! #######################################################################
+    F_inter = lambda z: z + np.array([np.interp(z[0], grid[...,0].numpy().flatten('F'),
+                                                deform[...,0].numpy().flatten('F')),
+                                      np.interp(z[1], grid[..., 1].numpy().flatten('F'),
+                                                deform[..., 1].numpy().flatten('F'))])
+    ##########################################################################################################
+
+    landmarks_transformed = []
+    p = identity.detach().numpy().reshape((-1, dim), order='F')  # order='F' needed?
+    g = grid.detach().numpy().reshape((-1, dim), order='F')
+
+    for i in range(0, num_landmarks):
+        y = landmarks[i, :]
+        min_idx = np.argmin(np.sum((g - y) ** 2, axis=1))
+        x = p[min_idx, :]
+
+        for j in range(0, 200):
+            sampled = F_inter(x)
+            x = x + (y - sampled)
+
+            if np.linalg.norm(sampled - y) < 1e-12:
+                print('Done with landmark ' +str(i)+', '+str(j+1)+' steps for inversion')
+                break
+
+        if np.linalg.norm(sampled - y) >= 1e-12:
+            print('Fixed-point iteration failed in 200 iterations! Returning initial guess.')
+            x = p[min_idx, :]
+
+        landmarks_transformed.append(torch.tensor(x))
+
+    print('Returning transformed landmarks!')
+    return torch.stack(landmarks_transformed)
+
+
+def landmark_accuracy(LM):
+    # LM has to be a list of landmark arrays!
+    k = len(LM)
+    m = LM[0].shape
+    y = np.zeros(np.append(m, k))
+
+    for i in range(0, k):
+        y[:, :, i] = LM[i]
+    y_bar = np.mean(y, axis=2)
+    acc = np.sum(np.sqrt(np.sum((y - y_bar[:, :, None]) ** 2, axis=1))[:, None, :], axis=2) / k
+
+    return acc
