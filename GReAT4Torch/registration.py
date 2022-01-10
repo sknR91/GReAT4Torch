@@ -5,6 +5,7 @@ from . import utils
 import GReAT4Torch
 import matplotlib.pyplot as plt
 
+
 class _Registration():
     def __init__(self, dtype=torch.float32, device='cpu'):
         self._dtype = dtype
@@ -51,6 +52,7 @@ class _Registration():
     def set_plot_progress(self, flag):
         self._plot_progress = flag
 
+
 class _GroupwiseRegistration(_Registration):
     def __init__(self, dtype=torch.float32, device='cpu'):
         super(_GroupwiseRegistration, self).__init__(dtype, device)
@@ -60,6 +62,18 @@ class _GroupwiseRegistration(_Registration):
 
     def set_images(self, images):
         self._images = images
+
+
+class _GroupwisePrincipalPreAlignment(_Registration):
+    def __init__(self, images, dtype=torch.float32, device='cpu'):
+        super(_GroupwisePrincipalPreAlignment, self).__init__(dtype, device)
+
+        # set images (previously defined in numpy-based GReAT as "Ic")
+        self._images = images
+
+    def set_images(self, images):
+        self._images = images
+
 
 class GroupwiseRegistration(_GroupwiseRegistration):
     def __init__(self, dtype=torch.float32, device='cpu'):
@@ -101,6 +115,7 @@ class GroupwiseRegistration(_GroupwiseRegistration):
             if self._print_info:
                 print(f" Iter {iter}: ", end='', flush=True)
             obj = self._optimizer.step(self._driver)
+
 
 class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
     def __init__(self, min_level, max_level, dtype=torch.float32, device='cpu'):
@@ -220,7 +235,8 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
             #self._transformation_type.set_image_size(image_sizes_levels[level])
 
             if level == self._min_level:
-                displacement = self._transformation_type._initialize_transformation_parameters(image_sizes_levels[level])
+                # displacement = self._transformation_type._initialize_transformation_parameters(image_sizes_levels[level])
+                displacement = self._transformation_type.get_level_displacement(image_sizes_levels[level])
                 self._transformation_type.set_parameters(displacement)
 
             if level != self._min_level:
@@ -249,3 +265,64 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
                 obj = self._optimizer.step(self._driver)
 
             displacement = self._transformation_type.get_displacement()
+
+
+class GroupwisePrincipalPreAlignment(_GroupwisePrincipalPreAlignment):
+    def __init__(self, images, dtype=torch.float32, device='cpu'):
+        super(GroupwisePrincipalPreAlignment, self).__init__(images, dtype, device)
+
+        self.set_images(images)
+
+    def _driver(self):
+        grid = self._transformation_type.get_grid()
+        num_images = self._transformation_type._num_images
+        image_size = self._transformation_type._image_size
+        m = torch.tensor(image_size[2:])
+        dim = len(image_size)-2
+        perm = np.roll(range(dim + 1), -1).tolist()
+
+        center_size = torch.zeros(dim)  # the center is simply zero because of the normalized grids; otherwise: m / 2
+        C = []; Cov = []; S = []; U = []
+
+        covM = torch.zeros((dim, dim))
+        flat_grid = grid.squeeze().permute(perm).view(-1, dim)  # get rid of unnecessary dimensions and flatten grid
+        # iterate over all images
+        for k in range(num_images):
+            flat_image = self._images[k].squeeze().view(-1)
+            C.append(torch.sum(flat_grid * flat_image[:, None], dim=0) / torch.sum(flat_image))  # comp. center of mass
+            Cov.append(utils.compute_covariance_matrix(flat_grid - C[k], flat_image))
+            tmp_s, tmp_u = torch.eig(Cov[k], eigenvectors=True)
+            S.append(torch.sqrt(tmp_s[:, 0].squeeze()))
+            U.append(tmp_u.squeeze())
+            covM += torch.diag(S[k] ** 2)
+
+        covM /= num_images
+        S_M, U_M = torch.eig(covM, eigenvectors=True)
+        S_M = torch.sqrt(S_M[:, 0].squeeze())
+
+        y = []; w = []
+
+        new_size = m.tolist()
+        new_size.insert(0, dim)
+
+        for k in range(num_images):
+            A = U[k] @ torch.diag(S[k]) @ torch.diag(1/S_M) @ U_M.T
+            b = C[k] - A @ center_size.T
+            w.append(torch.cat((A.view(-1), b)))
+            y.append((A @ flat_grid.T + b[:, None]).view(new_size).unsqueeze(0))
+
+            # some output
+            if self._print_info:
+                print(f"Pre-aligning image {k+1} of {num_images}.")
+
+        if self._print_info:
+            print(f"Done with pre-alignment of {num_images} images!")
+
+        return y, w
+
+    def start(self):
+        print("="*30, " Starting groupwise pre-alignment based on principal components ", "="*30)
+
+        y, w = self._driver()
+        self._transformation_type.set_affine_parameters(w)
+        self._transformation_type.set_grid(y)

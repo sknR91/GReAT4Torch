@@ -11,42 +11,69 @@ import nibabel as nib
 warnings.filterwarnings("ignore")
 
 
-def compute_grid(image_size, dtype=torch.float32, device='cpu'):
-    dim = len(image_size)
+# def compute_grid(image_size, dtype=torch.float32, device='cpu'):
+#     dim = len(image_size)
+#
+#     if (dim == 2):
+#         nx = image_size[0]
+#         ny = image_size[1]
+#
+#         x = torch.linspace(-1, 1, steps=nx).to(dtype=dtype)
+#         y = torch.linspace(-1, 1, steps=ny).to(dtype=dtype)
+#
+#         x = x.expand(ny, -1)
+#         y = y.expand(nx, -1).transpose(0, 1)
+#
+#         x.unsqueeze_(0).unsqueeze_(3)
+#         y.unsqueeze_(0).unsqueeze_(3)
+#
+#         return torch.cat((x, y), 3).to(dtype=dtype, device=device)
+#
+#     elif (dim == 3):
+#         nz = image_size[0]
+#         ny = image_size[1]
+#         nx = image_size[2]
+#
+#         x = torch.linspace(-1, 1, steps=nx).to(dtype=dtype)
+#         y = torch.linspace(-1, 1, steps=ny).to(dtype=dtype)
+#         z = torch.linspace(-1, 1, steps=nz).to(dtype=dtype)
+#
+#         x = x.expand(ny, -1).expand(nz, -1, -1)
+#         y = y.expand(nx, -1).expand(nz, -1, -1).transpose(1, 2)
+#         z = z.expand(nx, -1).transpose(0, 1).expand(ny, -1, -1).transpose(0, 1)
+#
+#         x.unsqueeze_(0).unsqueeze_(4)
+#         y.unsqueeze_(0).unsqueeze_(4)
+#         z.unsqueeze_(0).unsqueeze_(4)
+#
+#         return torch.cat((x, y, z), 4).to(dtype=dtype, device=device)
 
-    if (dim == 2):
-        nx = image_size[0]
-        ny = image_size[1]
 
-        x = torch.linspace(-1, 1, steps=nx).to(dtype=dtype)
-        y = torch.linspace(-1, 1, steps=ny).to(dtype=dtype)
+def compute_grid(image_size, dtype=torch.float32, device=torch.device('cpu')):
+    m = torch.tensor(image_size[2:])
+    dim = m.numel()
+    perm = np.roll(range(dim + 1), 1).tolist()
 
-        x = x.expand(ny, -1)
-        y = y.expand(nx, -1).transpose(0, 1)
+    if dim == 2:
+        theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]], device=device).unsqueeze(0).float(), m[0], m[1])
+    elif dim == 3:
+        theta = param2theta3(torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]],
+                                          device=device).unsqueeze(0).float(), m[2], m[0], m[1])
+    grid = F.affine_grid(theta, ([1, dim] + m.tolist()), align_corners=True).squeeze()
 
-        x.unsqueeze_(0).unsqueeze_(3)
-        y.unsqueeze_(0).unsqueeze_(3)
+    return grid.permute(perm).unsqueeze(0)
 
-        return torch.cat((x, y), 3).to(dtype=dtype, device=device)
 
-    elif (dim == 3):
-        nz = image_size[0]
-        ny = image_size[1]
-        nx = image_size[2]
+def compute_covariance_matrix(x, I):
 
-        x = torch.linspace(-1, 1, steps=nx).to(dtype=dtype)
-        y = torch.linspace(-1, 1, steps=ny).to(dtype=dtype)
-        z = torch.linspace(-1, 1, steps=nz).to(dtype=dtype)
+    if len(I.size()) > 1:
+        I = I.view(-1)
 
-        x = x.expand(ny, -1).expand(nz, -1, -1)
-        y = y.expand(nx, -1).expand(nz, -1, -1).transpose(1, 2)
-        z = z.expand(nx, -1).transpose(0, 1).expand(ny, -1, -1).transpose(0, 1)
+    variance = torch.tensor([[torch.sum(x[:, 0] * x[:, 0] * I), torch.sum(x[:, 0] * x[:, 1] * I)],
+                             [torch.sum(x[:, 1] * x[:, 0] * I), torch.sum(x[:, 1] * x[:, 1] * I)]])
+    sum_I = torch.sum(I)
 
-        x.unsqueeze_(0).unsqueeze_(4)
-        y.unsqueeze_(0).unsqueeze_(4)
-        z.unsqueeze_(0).unsqueeze_(4)
-
-        return torch.cat((x, y, z), 4).to(dtype=dtype, device=device)
+    return torch.divide(variance, sum_I)
 
 
 def warp_images(images, displacement):
@@ -525,13 +552,13 @@ def plot_progress(images, displacement):
         if num_imgs > 2:
             plt.subplot(sbplt+3)
             plt.imshow(images[2].cpu().squeeze().detach().numpy())
-        plt.subplot(sbplt+4)
+        plt.subplot(sbplt+4) if num_imgs > 2 else plt.subplot(sbplt+3)
         theta = param2theta(torch.tensor([[1, 0, 0], [0, 1, 0]]).unsqueeze(0).float(),
                                   displacement.size(2), displacement.size(3))
         ident = F.affine_grid(theta, displacement[0, 0, :, :].squeeze().unsqueeze(0).unsqueeze(0).size())
         pplt.plot_grid_2d(
             ident[0, ...].cpu().detach().numpy() + displacement[0, ...].permute(1, 2, 0).cpu().detach().numpy(), )
-        plt.subplot(sbplt+5)
+        plt.subplot(sbplt+5) if num_imgs > 2 else plt.subplot(sbplt+4)
         pplt.plot_grid_2d(
             ident[0, ...].cpu().detach().numpy() + displacement[1, ...].permute(1, 2, 0).cpu().detach().numpy(), )
         if num_imgs > 2:
