@@ -288,7 +288,7 @@ class GroupwisePrincipalPreAlignment(_GroupwisePrincipalPreAlignment):
         flat_grid = grid.squeeze().permute(perm).view(-1, dim)  # get rid of unnecessary dimensions and flatten grid
         # iterate over all images
         for k in range(num_images):
-            flat_image = self._images[k].squeeze().view(-1)
+            flat_image = self._images[k].squeeze().contiguous().view(-1)
             C.append(torch.sum(flat_grid * flat_image[:, None], dim=0) / torch.sum(flat_image))  # comp. center of mass
             Cov.append(utils.compute_covariance_matrix(flat_grid - C[k], flat_image))
             tmp_s, tmp_u = torch.eig(Cov[k], eigenvectors=True)
