@@ -10,6 +10,9 @@ import nibabel as nib
 from scipy.interpolate import griddata
 import scipy.ndimage.interpolation as inter
 from scipy import interpolate
+import inspect
+import datetime
+import json
 
 warnings.filterwarnings("ignore")
 
@@ -599,15 +602,15 @@ def landmark_transform(landmarks, displacement, omega, m):
             sampled = F_inter(x.copy())
             x = x + (y - sampled)
 
-            if j % 1 == 0:  # only print every third iteration
-                print(f'current status of landmark {i}: iter is at {j} of 22, norm: {np.linalg.norm(sampled - y)}')
+            if j % 3 == 0:  # only print every third iteration
+                print(f'current status of landmark {i}: iter is at {j} of 100, norm: {np.linalg.norm(sampled - y)}')
 
-            if np.linalg.norm(sampled - y) < 1e-12:
+            if np.linalg.norm(sampled - y) < 1e-8:
                 print('Done with landmark ' +str(i)+', '+str(j+1)+' steps for inversion')
                 break
 
-        if np.linalg.norm(sampled - y) >= 1e-12:
-            print('Fixed-point iteration failed in 200 iterations! Returning initial guess.')
+        if np.linalg.norm(sampled - y) >= 1e-8:
+            print('Fixed-point iteration failed in 100 iterations! Returning initial guess.')
             x = p[min_idx, :]
 
         landmarks_transformed.append(torch.tensor(x))
@@ -616,7 +619,7 @@ def landmark_transform(landmarks, displacement, omega, m):
     return torch.stack(landmarks_transformed)
 
 
-def landmark_accuracy(landmarks_list):
+def landmark_accuracy(landmarks_list, h=None):
     # input has to be a list of landmark arrays!
     k = len(landmarks_list)
     m = landmarks_list[0].shape
@@ -625,7 +628,11 @@ def landmark_accuracy(landmarks_list):
     for i in range(0, k):
         y[:, :, i] = landmarks_list[i]
     y_bar = np.mean(y, axis=2)
-    acc = np.sum(np.sqrt(np.sum((y - y_bar[:, :, None]) ** 2, axis=1))[:, None, :], axis=2) / k
+    if h is not None:
+        acc = np.sum(np.sqrt(np.sum((h[:, :, None] * y - h[:, :, None] * y_bar[:, :, None]) ** 2,
+                                    axis=1))[:, None, :], axis=2)  # / k
+    else:
+        acc = np.sum(np.sqrt(np.sum((y - y_bar[:, :, None]) ** 2, axis=1))[:, None, :], axis=2)  # / k
 
     return acc
 
@@ -701,3 +708,27 @@ def linear_interpolation(x, data, omega):
         Tc[valid] = part12 * (1 - xi(2)) + part34 * xi(2)
 
     return Tc
+
+
+def save_progress(displacement, params=None, rel_path='saves/', abs_path=None):
+    # identify calling script
+    filename = inspect.stack()[1].filename
+    path_array = str.split(filename, '/')
+
+    # create absolute path of calling script and caller name
+    if abs_path is None:
+        abs_path = ''
+        for k in range(len(path_array)-1):
+            abs_path += path_array[k] + '/'
+    caller = path_array[-1][:-3]  # :-3 to remove .py file-extension
+
+    now = datetime.datetime.now()  # get time
+    save_path = abs_path + rel_path + caller + '/'  # when copying into driver script: substitute caller with os.path.basename(__file__)[:-3]
+    save_name = now.strftime("%Y%m%d_%H-%M") + '_' + caller
+
+    if params is not None:
+        json.dump(params, open(save_path + save_name + '.json', 'w'))  # save parameters as .json
+
+    torch.save(displacement, save_path + save_name + '.pt')  # save displacement as .pt
+
+    print('Progress successfully saved as ' + save_path + save_name + ' ...')
