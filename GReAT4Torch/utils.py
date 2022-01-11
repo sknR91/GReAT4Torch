@@ -8,6 +8,8 @@ import warnings
 import GReAT4Torch
 import nibabel as nib
 from scipy.interpolate import griddata
+import scipy.ndimage.interpolation as inter
+from scipy import interpolate
 
 warnings.filterwarnings("ignore")
 
@@ -556,18 +558,30 @@ def landmark_transform(landmarks, displacement, omega, m):
     # setup identity grid
     identity = compute_grid(m_in, dtype=displacement[0, ...].dtype,
                             device=displacement[0, ...].device).squeeze().permute(np.roll(range(dim + 1), -1).tolist())
-    identity = denormalize_displacement(identity.permute(2, 0, 1).unsqueeze(0),
-                                    shift=True, omega=omega).squeeze().permute(1, 2, 0)
 
-    # setup deformation grid
-    grid = displacement.squeeze().permute(1, 2, 0) + identity
+    if dim == 2:
+        identity = denormalize_displacement(identity.permute(2, 0, 1).unsqueeze(0),
+                                        shift=True, omega=omega).squeeze().permute(1, 2, 0)
 
-    # setup interpolation method
-    interpolation_x = lambda z: griddata((grid[..., 0].flatten(), grid[..., 1].flatten()),
-                                         identity[..., 0].flatten(), z, fill_value=0, method='linear')
-    interpolation_y = lambda z: griddata((grid[..., 0].flatten(), grid[..., 1].flatten()),
-                                         identity[..., 1].flatten(), z, fill_value=0, method='linear')
-    F_inter = lambda z: np.array([interpolation_x(z), interpolation_y(z)]).T.ravel()
+        # setup deformation grid
+        grid = displacement.squeeze().permute(1, 2, 0) + identity
+
+        # setup interpolation method
+        interpolation_x = lambda z: linear_interpolation(z.copy(), grid[..., 0].numpy().copy(), omega.numpy())
+        interpolation_y = lambda z: linear_interpolation(z.copy(), grid[..., 1].numpy().copy(), omega.numpy())
+        F_inter = lambda z: np.array([interpolation_y(z), interpolation_x(z)]).T.ravel()
+    elif dim == 3:
+        identity = denormalize_displacement(identity.permute(3, 0, 1, 2).unsqueeze(0),
+                                            shift=True, omega=omega).squeeze().permute(1, 2, 3, 0)
+
+        # setup deformation grid
+        grid = displacement.squeeze().permute(1, 2, 3, 0) + identity
+
+        # setup interpolation method
+        interpolation_x = lambda z: linear_interpolation(z.copy(), grid[..., 0].numpy().copy(), omega.numpy())
+        interpolation_y = lambda z: linear_interpolation(z.copy(), grid[..., 1].numpy().copy(), omega.numpy())
+        interpolation_z = lambda z: linear_interpolation(z.copy(), grid[..., 2].numpy().copy(), omega.numpy())
+        F_inter = lambda z: np.array([interpolation_z(z), interpolation_y(z), interpolation_x(z)]).T.ravel()
 
     # prepare list of transformed landmarks and flatten grids
     landmarks_transformed = []
@@ -576,16 +590,16 @@ def landmark_transform(landmarks, displacement, omega, m):
 
     # iterate over all landmarks
     for i in range(0, num_landmarks):
-        y = np.roll(landmarks[i, :], 1)
+        y = landmarks[i, :]
         min_idx = np.argmin(np.sum((g - y) ** 2, axis=1))  # search for best fit of the landmark on the deformation grid
         x = p[min_idx, :]  # take the same linear index from the identity grid
 
         # Newton for landmark inversion
-        for j in range(0, 22):
-            sampled = F_inter(x)
+        for j in range(0, 100):
+            sampled = F_inter(x.copy())
             x = x + (y - sampled)
 
-            if j % 3 == 0:  # only print every third iteration
+            if j % 1 == 0:  # only print every third iteration
                 print(f'current status of landmark {i}: iter is at {j} of 22, norm: {np.linalg.norm(sampled - y)}')
 
             if np.linalg.norm(sampled - y) < 1e-12:
@@ -596,7 +610,7 @@ def landmark_transform(landmarks, displacement, omega, m):
             print('Fixed-point iteration failed in 200 iterations! Returning initial guess.')
             x = p[min_idx, :]
 
-        landmarks_transformed.append(torch.tensor(np.roll(x, 1)))
+        landmarks_transformed.append(torch.tensor(x))
 
     print('Returning transformed landmarks!')
     return torch.stack(landmarks_transformed)
@@ -614,3 +628,76 @@ def landmark_accuracy(landmarks_list):
     acc = np.sum(np.sqrt(np.sum((y - y_bar[:, :, None]) ** 2, axis=1))[:, None, :], axis=2) / k
 
     return acc
+
+
+def linear_interpolation(x, data, omega):
+    dim = len(data.shape)
+    m = np.array(data.shape)
+    h = np.array([(omega[1] - omega[0]) / m[0], (omega[3] - omega[2]) / m[1]])
+    if dim == 3:
+        h = np.append(h, np.array((omega[5] - omega[4]) / m[2]))
+
+    n = int(len(x) / dim)
+    x = x.reshape(n, dim ,order='F')
+    Tc = np.zeros(n)
+
+    for k in range(0, dim):
+        x[:, k] = (x[:, k] - omega[2 * k]) / h[k] + 0.5
+
+    datashape = np.ones(dim)
+    for k in range(0, len(data.shape)):
+        datashape[k] = data.shape[k]
+
+    # determine indices of valid points
+    Valid = lambda j: ((0 < x[:, j]) & (x[:, j] < m[j] + 1))
+    valid = np.empty(n)
+    if dim == 1:
+        valid = np.where(Valid(0))[0]
+    elif dim == 2:
+        valid = np.where(Valid(0) & Valid(1))[0]
+    elif dim == 3:
+        valid = np.where(Valid(0) & Valid(1) & Valid(2))[0]
+
+    # pad data to reduce cases
+    pad = 1
+    TP = np.zeros(m + 2 * pad)
+
+    P = np.floor(x).astype('int')
+    x = x - P
+    p = lambda j: P[valid, j]
+    xi = lambda j: x[valid, j]
+
+    # increments for linear ordering
+    i1 = 1
+    i2 = datashape[0].astype('int') + 2 * pad
+    i3 = i2 * (datashape[1].astype('int') + 2 * pad)
+
+    # interpolation for different dimensions
+    if dim == 1:
+        TP[range(0 + pad, m[0] + pad)] = np.reshape(data, (int(m[0]),) ,order='F')
+        TP = TP.ravel('F')
+        del data
+        p = pad + p(0)
+        Tc[valid] = TP[p - 1] * (1 - xi(0)) + TP[p] * xi(0)
+    if dim == 2:
+        TP[(0 + pad):(m[0] + pad), (0 + pad):(m[1] + pad)] = data
+        TP = TP.flatten('F')
+        del data
+        p = ((pad + p(0)) + i2 * (pad + p(1) - 1)).ravel('F')
+        part1 = TP[p - 1] * (1 - xi(0)) + TP[p - 1 + i1] * xi(0)
+        part2 = TP[p - 1 + i2] * (1 - xi(0)) + TP[p - 1 + i1 + i2] * xi(0)
+        Tc[valid] = part1 * (1 - xi(1)) + part2 * xi(1)
+    if dim == 3:
+        TP[(0 + pad):(m[0] + pad), (0 + pad):(m[1] + pad), (0 + pad):(m[2] + pad)] = data
+        TP = TP.reshape(((m[0] + 2 * pad) * (m[1] + 2 * pad) * (m[2] + 2 * pad)), order='F')#ravel('F')
+        del data
+        p = ((pad + p(0)) + i2 * (pad + p(1) - 1) + i3 * (pad + p(2) - 1)).ravel('F')
+        part1 = TP[p - 1] * (1 - xi(0)) + TP[p - 1 + i1] * xi(0)
+        part2 = TP[p - 1 + i2] * (1 - xi(0)) + TP[p - 1 + i1 + i2] * xi(0)
+        part3 = TP[p - 1 + i3] * (1 - xi(0)) + TP[p - 1 + i1 + i3] * xi(0)
+        part4 = TP[p - 1 + i2 + i3] * (1 - xi(0)) + TP[p - 1 + i1 + i2 + i3] * xi(0)
+        part12 = part1 * (1 - xi(1)) + part2 * xi(1)
+        part34 = part3 * (1 - xi(1)) + part4 * xi(1)
+        Tc[valid] = part12 * (1 - xi(2)) + part34 * xi(2)
+
+    return Tc
