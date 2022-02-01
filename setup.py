@@ -5,7 +5,10 @@ url = ''
 
 install_requires = ['torch',
                     'numpy',
-                    'matplotlib']
+                    'matplotlib',
+                    'nibabel',
+                    'scipy',
+                    'PyQt5']
 
 setup(
     name='GReAT4Torch',
