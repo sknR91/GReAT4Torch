@@ -5,7 +5,9 @@ url = ''
 
 install_requires = ['torch',
                     'numpy',
-                    'matplotlib']
+                    'matplotlib',
+                    'nibabel',
+                    'Pillow-PIL']
 
 setup(
     name='GReAT4Torch',

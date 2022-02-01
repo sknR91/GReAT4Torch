@@ -104,7 +104,7 @@ class GroupwiseRegistration(_GroupwiseRegistration):
 
         obj.backward()
 
-        return obj
+        return obj, dist, regul
 
     def start(self):
         print("="*30, " Starting groupwise image registration ", "="*30)
@@ -114,7 +114,15 @@ class GroupwiseRegistration(_GroupwiseRegistration):
         for iter in range(self._max_iterations):
             if self._print_info:
                 print(f" Iter {iter}: ", end='', flush=True)
-            obj = self._optimizer.step(self._driver)
+            obj, dist, regul = self._optimizer.step(self._driver)
+
+            if self._plot_progress >= 2:
+                if iter == 0:
+                    # ax = plt.axes()
+                    fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3)
+                utils.plot_loss(iter, obj.detach(), axs=[ax1, ax2, ax3],
+                                distance=dist.detach(), regularizer=regul.detach())
+                ax1 = ax1; ax2 = ax2; ax3 = ax3
 
 
 class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
@@ -126,6 +134,11 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         self._max_level_data = None
         self._adaptive_alpha = False
         self._adaptive_lr = False
+        self._adaptive_iter = False
+
+    def set_adaptive_iter(self, iter_list):
+        self._max_iterations = iter_list
+        self._adaptive_iter = True
 
     def set_adaptive_alpha(self, flag, rate=50):
         self._adaptive_alpha = flag
@@ -139,7 +152,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
         self._optimizer.zero_grad()
         displacement = self._transformation_type()
 
-        if self._plot_progress:
+        if self._plot_progress >= 1 and self._plot_progress <= 2:
             utils.plot_progress(utils.warp_images(self._images, displacement), displacement)
 
         # compute distance between images
@@ -160,7 +173,7 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
 
         obj.backward(retain_graph=True)
 
-        return obj
+        return obj, dist, regul
 
     def _get_max_level_parameters(self, max_level, image_size):
         image_size = torch.tensor(image_size[2:])
@@ -259,10 +272,29 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
             # reinitialize the optimizer instance with new "params" and all pre-set attributes!
             self._optimizer.__init__(self._transformation_type.parameters(), **optim_attributes)
 
-            for iter in range(self._max_iterations):
+            if self._adaptive_iter:
+                max_iter = self._max_iterations[level]
+            else:
+                max_iter = self._max_iterations
+
+            for iter in range(max_iter):
                 if self._print_info:
                     print(f" Iter {iter}: ", end='', flush=True)
-                obj = self._optimizer.step(self._driver)
+                obj, dist, regul = self._optimizer.step(self._driver)
+
+                if False: #self._adaptive_lr:
+                    if iter <= 50:
+                        self._optimizer.param_groups[0]['lr'] = self._optimizer.param_groups[0]['lr'] * 1.01
+                    elif iter > 50 and iter <= 100:
+                        self._optimizer.param_groups[0]['lr'] = self._optimizer.param_groups[0]['lr'] * 1.02
+
+                if self._plot_progress >= 2:
+                    if iter == 0:
+                        #ax = plt.axes()
+                        fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3)
+                    utils.plot_loss(iter, obj.detach(), axs=[ax1, ax2, ax3],
+                                    distance=dist.detach(), regularizer=regul.detach())
+                    ax1 = ax1; ax2 = ax2; ax3 = ax3
 
             displacement = self._transformation_type.get_displacement()
 
