@@ -13,6 +13,8 @@ from scipy import interpolate
 import inspect
 import datetime
 import json
+import Image
+import pydicom as dicom
 
 warnings.filterwarnings("ignore")
 
@@ -96,6 +98,12 @@ def prolong_displacements(displacement, new_size):
         prolonged_displacement.append(torch.stack(prolonged_tmp).squeeze())
 
     return torch.stack(prolonged_displacement)
+
+def warp_images_full_size(images, displacement, full_size):
+    displacement_full = prolong_displacements(displacement, full_size)
+    warped_images_full = warp_images(images, displacement_full)
+
+    return warped_images_full
 
 
 def displacement2grid(displacement):
@@ -364,6 +372,48 @@ def compute_ball(image_size, radius, center):
     return ball
 
 
+def read_dicom(path, dtype=torch.float32, device=torch.device('cpu')):
+    ds = dicom.dcmread(path)
+
+    return torch.tensor(ds.pixel_array.astype(np.float), dtype=dtype, device=device)
+
+
+def save_imagesequence(seq, name='image', path='./img/', type='.tiff', scale=False):
+    imgs = []
+    n = seq.shape[2]
+    fll = len(str(n))
+    for k in range(0,seq.shape[2]):
+        if type == '.gif':
+            imgs.append(seq[:,:,k].astype(np.uint8))
+        else:
+            if scale:
+                sc = (255.0 / seq[:,:,k].max() * (seq[:,:,k] - seq[:,:,k].min())).astype(np.uint8)
+            else:
+                sc = seq[:,:,k].astype(np.uint8)
+            im = Image.fromarray(sc)
+            im.save(path+name+str(k).zfill(fll)+type)
+
+    if type == 'gif':
+        imageio.mimsave(path + name + type, imgs)
+
+
+def save_imagelist(lst, name='image', path='./img/', type='.tiff', scale=False, convert=False):
+    k = 0
+    n = len(lst)
+    fll = len(str(n))
+    for x in lst:
+        x = x.squeeze().numpy()
+        if scale:
+            sc = (255.0 / x.max() * (x - x.min())).astype(np.uint8)
+        else:
+            sc = x.astype(np.uint8)
+        im = Image.fromarray(sc)
+        if convert:
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im.save(path+name+str(k).zfill(fll)+type)
+        k += 1
+
+
 def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=False, dtype=torch.float32,
                    device=torch.device('cpu')):
     # skipping subdirectories!
@@ -545,6 +595,24 @@ def plot_progress(images, displacement):
             plt.subplot(sbplt+3)
             plt.imshow(images[2].squeeze()[..., int(n)].cpu().squeeze().detach().numpy())
         plt.pause(0.001)
+
+def plot_loss(iter, objective, axs, distance=None, regularizer=None):
+    ax1 = axs[0]
+    ax2 = axs[1]
+    ax3 = axs[2]
+    ax1.plot(iter, objective, 'rx')
+    ax1.title.set_text('Objective')
+
+    if distance is not None:
+        ax2.plot(iter, distance, 'go')
+        ax2.title.set_text('Distance')
+
+    if regularizer is not None:
+        ax3.plot(iter, regularizer, 'bd')
+        ax3.title.set_text('Regularizer')
+
+
+    plt.pause(0.001)
 
 
 def landmark_transform(landmarks, displacement, omega, m):
@@ -732,3 +800,16 @@ def save_progress(displacement, params=None, rel_path='saves/', abs_path=None):
     torch.save(displacement, save_path + save_name + '.pt')  # save displacement as .pt
 
     print('Progress successfully saved as ' + save_path + save_name + ' ...')
+
+
+def load_progress(file):
+    print('Loading parameters from ' + file + '.json ...')
+    with open(file + '.json') as json_file:
+        parameters = json.load(json_file)
+
+    print('Loading displacement from ' + file + '.pt ...')
+    displacement = torch.load(file + '.pt')
+
+    print('Successfully loaded data!')
+
+    return displacement, parameters
