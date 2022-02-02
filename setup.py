@@ -9,7 +9,8 @@ install_requires = ['torch',
                     'nibabel',
                     'scipy',
                     'PyQt5,
-                    'Pillow-PIL']
+                    'Pillow-PIL',
+                    'pydicom']
 
 setup(
     name='GReAT4Torch',

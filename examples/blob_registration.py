@@ -1,5 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('QtAgg')
 import time
 import numpy as np
 
@@ -15,9 +17,9 @@ def main():
     device = torch.device('cpu')
 
     ######## create circle data using numpy based GReAT-tools ##########################################################
-    A = grt.compute_circle(np.array([400, 400]), 100, np.array([200, 200]))
-    B = grt.compute_circle(np.array([400, 400]), 100, np.array([250, 220]))
-    C = grt.compute_circle(np.array([400, 400]), 100, np.array([170, 200]))
+    A = grt.compute_circle(np.array([400, 400]), 100, np.array([200, 200])) / 255
+    B = grt.compute_circle(np.array([400, 400]), 100, np.array([250, 220])) / 255
+    C = grt.compute_circle(np.array([400, 400]), 100, np.array([170, 200])) / 255
 
     Ic = [torch.Tensor(A).to(device).unsqueeze(0).unsqueeze(0), torch.Tensor(B).to(device).unsqueeze(0).unsqueeze(0),
           torch.Tensor(C).to(device).unsqueeze(0).unsqueeze(0)]

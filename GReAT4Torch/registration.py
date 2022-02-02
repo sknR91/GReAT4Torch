@@ -27,6 +27,9 @@ class _Registration():
         # set transformation type
         self._transformation_type = None
 
+        # set reference image
+        self._reference_image = None
+
         # set flag for printing iteration information and plotting the progress
         self._print_info = True
         self._plot_progress = False
@@ -45,6 +48,9 @@ class _Registration():
 
     def set_transformation_type(self, transformation_type):
         self._transformation_type = transformation_type
+
+    def set_reference_image(self, reference_image):
+        self._reference_image = reference_image
 
     def set_print_info(self, flag):
         self._print_info = flag
@@ -151,6 +157,12 @@ class GroupwiseRegistrationMultilevel(_GroupwiseRegistration):
     def _driver(self):
         self._optimizer.zero_grad()
         displacement = self._transformation_type()
+
+        if self._reference_image is not None:
+            new_displacement = displacement.clone()
+            zero_displacement = new_displacement[self._reference_image] * 0
+            new_displacement[self._reference_image] = zero_displacement
+            displacement = new_displacement
 
         if self._plot_progress >= 1 and self._plot_progress <= 2:
             utils.plot_progress(utils.warp_images(self._images, displacement), displacement)
