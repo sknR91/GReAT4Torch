@@ -17,8 +17,14 @@ The following packages are needed (e.g. using pip for download):
     - torch
     - numpy
     - matplotlib
+    - nibabel
+    - scipy
+    - PyQt5
+    - Pillow-PIL
+    - pydicom
     
 **NOTE**: When used with PyCharm, it is strongly recommended to uncheck 'File > Settings > Tools > Python Scientific > Show plots in tool window' in order to use interactive plotting methods from class "plot"
+When interactive plots do not work, please import matplotlib and activate the PyQt-backend.
 
 ## Documentation
 There is no documentation available yet!
