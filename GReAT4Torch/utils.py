@@ -845,7 +845,12 @@ def remove_background(images_list, lower=12, upper=190, hist_eq=False):
 
 
 def remove_background_rgb(rgb_images, lower=12, upper=190, ref_channel=0, hist_eq = False):
-    _, labels = remove_background(rgb_images[:, ref_channel, ...].tolist(), lower, upper, hist_eq)
+    if rgb_images.shape[0] > 1:
+        imgs = rgb_images[:, ref_channel, ...].tolist()
+    else:
+        imgs = [rgb_images[:, ref_channel, ...].squeeze()]
+
+    _, labels = remove_background(imgs, lower, upper, hist_eq)
     rgb_segmented = rgb_images * torch.stack(labels)
 
     return rgb_segmented
