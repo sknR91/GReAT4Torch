@@ -7,7 +7,10 @@ install_requires = ['torch',
                     'numpy',
                     'matplotlib',
                     'nibabel',
-                    'Pillow-PIL']
+                    'scipy',
+                    'PyQt5,
+                    'Pillow-PIL',
+                    'pydicom']
 
 setup(
     name='GReAT4Torch',
