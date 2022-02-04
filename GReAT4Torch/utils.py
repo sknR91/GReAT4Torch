@@ -7,9 +7,7 @@ import matplotlib.pyplot as plt
 import warnings
 import GReAT4Torch
 import nibabel as nib
-from scipy.interpolate import griddata
-import scipy.ndimage.interpolation as inter
-from scipy import interpolate
+from scipy.ndimage import measurements
 import inspect
 import datetime
 import json
@@ -813,3 +811,41 @@ def load_progress(file):
     print('Successfully loaded data!')
 
     return displacement, parameters
+
+
+def get_largest_connected_component(labels, k=0): # k indicates the k-largest area, starting from 0
+    unique, counts = np.unique(labels, return_counts=True)
+    list_seg = list(zip(unique, counts))[1:]  # the 0 label is by default background so take the rest
+    largest = max(list_seg, key=lambda x: x[1])[k]
+    labels_max = (labels == largest).astype(int)
+
+    return labels_max
+
+
+def images_to_binary(images_list, lower, upper):
+    images_binary = []
+    for img in images_list:
+        images_binary.append((lower < img) & (img < upper))
+
+    return images_binary
+
+
+def remove_background(images_list, lower=12, upper=190, hist_eq=False):
+    images_binary = images_to_binary(images_list, lower, upper)
+
+    labels = []
+    for imgs in images_binary:
+        labels.append(torch.tensor(get_largest_connected_component(measurements.label(imgs.numpy())[0])))
+
+    images_segmented = []
+    for k in range(len(images_list)):
+        images_segmented.append(images_list[k] * labels[k])
+
+    return images_segmented, labels
+
+
+def remove_background_rgb(rgb_images, lower=12, upper=190, ref_channel=0, hist_eq = False):
+    _, labels = remove_background(rgb_images[:, ref_channel, ...].tolist(), lower, upper, hist_eq)
+    rgb_segmented = rgb_images * torch.stack(labels)
+
+    return rgb_segmented
