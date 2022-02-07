@@ -64,7 +64,7 @@ class CurvatureRegularizer(_Regularizer):
         L = L ** 2
         L = torch.sum(L, dim=[1, 2, 3])
 
-        L *= h.prod(dim=1)
+        L = L * h.prod(dim=1)
 
         return L
 
@@ -166,14 +166,14 @@ class SecondOrderDerivative(_Regularizer):
         self._h = pixel_spacing
         self._padding_mode = 'zeros'
 
-        def set_padding_mode(self, padding_mode):
-            assert padding_mode in ('zeros', 'reflect')
-            self._padding_mode = padding_mode
-
         if self._dim == 2:
             self._second_order_derivative = self._second_order_derivative_2d
         elif self._dim == 3:
             self._second_order_derivative = self._second_order_derivative_3d
+
+    def set_padding_mode(self, padding_mode):
+        assert padding_mode in ('zeros', 'reflect')
+        self._padding_mode = padding_mode
 
     def _second_order_derivative_2d(self, tensor):
         m = tensor.size()
