@@ -1,6 +1,8 @@
-torch~=1.10.1
-matplotlib~=3.5.1
-numpy~=1.21.5
-setuptools~=57.0.0
-nibabel~=3.2.1
+torch
+numpy
+matplotlib
+nibabel
+scipy
+PyQt5
 Pillow-PIL
+pydicom
