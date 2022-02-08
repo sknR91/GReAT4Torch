@@ -881,20 +881,12 @@ def remove_background_rgb(rgb_images, lower=12, upper=190, ref_channel=0, hist_e
 
 
 def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
-
-    if rgb:
-        idx_x = 2
-        idx_y = 3
-    else:
-        idx_x = 1
-        idx_y = 2
-
     # find maximum size in x and y direction
     sizes_x = []
     sizes_y = []
     for k in range(0, len(images_list)):
-        sizes_x.append(images_list[k].shape[idx_x])
-        sizes_y.append(images_list[k].shape[idx_y])
+        sizes_x.append(images_list[k].shape[2])
+        sizes_y.append(images_list[k].shape[3])
     max1 = int(max(sizes_x)) + 2 * bound_x
     max2 = int(max(sizes_y)) + 2 * bound_y
 
@@ -907,11 +899,11 @@ def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
     k = 0
     for img in images_list:
         print('Padding image '+str(k+1))
-        bound00 = abs(int((max1-img.shape[0])/2))
-        bound01 = img.shape[0]+bound00
-        bound10 = abs(int((max2-img.shape[1])/2))
-        bound11 = img.shape[1] + bound10
-        tmp[... , bound00:bound01, bound10:bound11] = img
+        bound00 = abs(int((max1-img.shape[2])/2))
+        bound01 = img.shape[2]+bound00
+        bound10 = abs(int((max2-img.shape[3])/2))
+        bound11 = img.shape[3] + bound10
+        tmp[:, :, bound00:bound01, bound10:bound11] = img
         padded_images_list.append(tmp)
         k += 1
 
