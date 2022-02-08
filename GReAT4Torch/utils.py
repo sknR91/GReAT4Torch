@@ -13,6 +13,7 @@ import datetime
 import json
 import Image
 import pydicom as dicom
+import platform
 
 warnings.filterwarnings("ignore")
 
@@ -779,7 +780,10 @@ def linear_interpolation(x, data, omega):
 def save_progress(displacement, params=None, rel_path='saves/', abs_path=None):
     # identify calling script
     filename = inspect.stack()[1].filename
-    path_array = str.split(filename, '/')
+    if 'Windows' in platform.platform():
+        path_array = str.split(filename, '\\')
+    else:
+        path_array = str.split(filename, '/')
 
     # create absolute path of calling script and caller name
     if abs_path is None:
