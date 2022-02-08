@@ -903,7 +903,7 @@ def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
     if rgb:
         tmp = torch.zeros((1, 3, max1, max2))
     else:
-        tmp = torch.zeros((1, max1, max2))
+        tmp = torch.zeros((1, 1, max1, max2))
     k = 0
     for img in images_list:
         print('Padding image '+str(k+1))
