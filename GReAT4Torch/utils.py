@@ -15,6 +15,8 @@ import Image
 import pydicom as dicom
 import platform
 import pathlib
+import tkinter as tk
+from tkinter import filedialog
 
 warnings.filterwarnings("ignore")
 
@@ -382,15 +384,17 @@ def save_imagesequence(seq, name='image', path='./img/', type='.tiff', scale=Fal
     imgs = []
     n = seq.shape[2]
     fll = len(str(n))
-    for k in range(0,seq.shape[2]):
+    for k in range(0, seq.shape[2]):
         if type == '.gif':
-            imgs.append(seq[:,:,k].astype(np.uint8))
+            imgs.append(seq[:, :, k].astype(np.uint8))
         else:
             if scale:
-                sc = (255.0 / seq[:,:,k].max() * (seq[:,:,k] - seq[:,:,k].min())).astype(np.uint8)
+                sc = (255.0 / seq[:, :, k].max() * (seq[:, :, k] - seq[:, :, k].min())).astype(np.uint8)
             else:
-                sc = seq[:,:,k].astype(np.uint8)
+                sc = seq[:, :, k].astype(np.uint8)
             im = Image.fromarray(sc)
+            pathlib.Path(path).mkdir(parents=True,
+                                          exist_ok=True)  # check if save_path exists. if not: create it and all parental directories
             im.save(path+name+str(k).zfill(fll)+type)
 
     if type == 'gif':
@@ -796,7 +800,7 @@ def save_progress(displacement, params=None, rel_path='saves/', abs_path=None):
     now = datetime.datetime.now()  # get time
     save_path = abs_path + rel_path + caller + '/'  # when copying into driver script: substitute caller with os.path.basename(__file__)[:-3]
     pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)  # check if save_path exists. if not: create it and all parental directories
-    save_name = now.strftime("%Y%m%d_%H-%M") + '_' + caller
+    save_name = now.strftime('d' + '%Y%m%d' + '_t' + '%H%M%S') + '_' + caller
 
     if params is not None:
         json.dump(params, open(save_path + save_name + '.json', 'w'))  # save parameters as .json
@@ -806,7 +810,18 @@ def save_progress(displacement, params=None, rel_path='saves/', abs_path=None):
     print('Progress successfully saved as ' + save_path + save_name + ' ...')
 
 
-def load_progress(file):
+def load_progress(file=None, dialog=True):
+    if dialog:
+        root = tk.Tk()
+        root.withdraw()
+        file = str.split(filedialog.askopenfilename(), '.')[0]
+        path_array = str.split(file, '/')
+
+        abs_path = ''
+        for k in range(len(path_array) - 1):
+            abs_path += path_array[k] + '/'
+        filename = path_array[-1][:]
+
     print('Loading parameters from ' + file + '.json ...')
     with open(file + '.json') as json_file:
         parameters = json.load(json_file)
@@ -816,7 +831,10 @@ def load_progress(file):
 
     print('Successfully loaded data!')
 
-    return displacement, parameters
+    if dialog:
+        return displacement, parameters, abs_path, filename
+    else:
+        return displacement, parameters
 
 
 def get_largest_connected_component(labels, k=0): # k indicates the k-largest area, starting from 0
