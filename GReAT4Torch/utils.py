@@ -880,7 +880,7 @@ def remove_background_rgb(rgb_images, lower=12, upper=190, ref_channel=0, hist_e
     return rgb_segmented
 
 
-def pad_images_2D(images_list, bound_x=0, bound_y=0, rgb=False):
+def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
 
     if rgb:
         idx_x = 2
@@ -903,7 +903,7 @@ def pad_images_2D(images_list, bound_x=0, bound_y=0, rgb=False):
     if rgb:
         tmp = torch.zeros((1, 3, max1, max2))
     else:
-        tmp = torch.zeros((1, 3, max1, max2))
+        tmp = torch.zeros((1, max1, max2))
     for img in images_list:
         print('Padding image '+str(k+1))
         bound00 = abs(int((max1-img.shape[0])/2))
