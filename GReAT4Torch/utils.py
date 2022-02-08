@@ -918,8 +918,8 @@ def remove_padding_2d(images_list, bound_x=0, bound_y=0):
     sizes_y_min = []
     for img in images_list:
         idx = img.nonzero()
-        sizes_x_max.append(idx[:, 2].min())
-        sizes_x_min.append(idx[:, 2].max())
+        sizes_x_max.append(idx[:, 2].max())
+        sizes_x_min.append(idx[:, 2].min())
         sizes_y_max.append(idx[:, 3].max())
         sizes_y_min.append(idx[:, 3].min())
     max_x = int(max(sizes_x_max)) + bound_x
