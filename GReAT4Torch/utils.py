@@ -907,4 +907,4 @@ def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
         padded_images_list.append(tmp)
         k += 1
 
-    return tmp
+    return padded_images_list
