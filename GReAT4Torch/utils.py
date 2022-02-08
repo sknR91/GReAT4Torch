@@ -892,12 +892,13 @@ def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
 
     # set up zero image and embed original image in the center
     padded_images_list = []
-    if rgb:
-        tmp = torch.zeros((1, 3, max1, max2))
-    else:
-        tmp = torch.zeros((1, 1, max1, max2))
     k = 0
     for img in images_list:
+        if rgb:
+            tmp = torch.zeros((1, 3, max1, max2))
+        else:
+            tmp = torch.zeros((1, 1, max1, max2))
+
         print('Padding image '+str(k+1))
         bound00 = abs(int((max1-img.shape[2])/2))
         bound01 = img.shape[2]+bound00
