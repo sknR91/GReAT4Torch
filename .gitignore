@@ -1,3 +1,5 @@
 .idea
 venv
 examples/.gitkeep
+__pycache__
+*.egg-info
