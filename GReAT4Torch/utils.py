@@ -14,6 +14,7 @@ import json
 import Image
 import pydicom as dicom
 import platform
+import pathlib
 
 warnings.filterwarnings("ignore")
 
@@ -794,6 +795,7 @@ def save_progress(displacement, params=None, rel_path='saves/', abs_path=None):
 
     now = datetime.datetime.now()  # get time
     save_path = abs_path + rel_path + caller + '/'  # when copying into driver script: substitute caller with os.path.basename(__file__)[:-3]
+    pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)  # check if save_path exists. if not: create it and all parental directories
     save_name = now.strftime("%Y%m%d_%H-%M") + '_' + caller
 
     if params is not None:
