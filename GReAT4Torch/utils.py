@@ -904,6 +904,7 @@ def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
         tmp = torch.zeros((1, 3, max1, max2))
     else:
         tmp = torch.zeros((1, max1, max2))
+    k = 0
     for img in images_list:
         print('Padding image '+str(k+1))
         bound00 = abs(int((max1-img.shape[0])/2))
@@ -912,5 +913,6 @@ def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
         bound11 = img.shape[1] + bound10
         tmp[... , bound00:bound01, bound10:bound11] = img
         padded_images_list.append(tmp)
+        k += 1
 
     return tmp
