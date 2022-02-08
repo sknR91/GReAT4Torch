@@ -910,7 +910,7 @@ def pad_images_2d(images_list, bound_x=0, bound_y=0, rgb=False):
 
     return padded_images_list
 
-def remove_padding_2d(images_list, bound_x=10, bound_y=10):
+def remove_padding_2d(images_list, bound_x=0, bound_y=0):
     # find maximum size in x and y direction
     sizes_x_max = []
     sizes_x_min = []
@@ -931,7 +931,7 @@ def remove_padding_2d(images_list, bound_x=10, bound_y=10):
     cropped_images_list = []
     k = 0
     for img in images_list:
-        print('Padding image ' + str(k + 1))
+        print('Cropping image ' + str(k + 1))
         cropped_images_list.append(img[..., min_x:max_x, min_y:max_y])
         k += 1
 
