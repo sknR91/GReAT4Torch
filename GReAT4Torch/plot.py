@@ -116,7 +116,7 @@ class plot:
         self.ax.vol = volume
         self.ax.idx = volume.shape[-1] // 2
         self.ax.viewer = 'scrollView3'
-        self.plotted_image = self.ax.imshow(volume[:, :, self.ax.idx], cmap=colormap, extent=omega,
+        self.plotted_image = self.ax.imshow(volume[..., self.ax.idx], cmap=colormap, extent=omega,
                             norm=mpl.colors.Normalize(vmin=np.min(volume), vmax=np.max(volume)))
         self.fig.colorbar(self.plotted_image) if colorbar else 1
         ttl = 'Position: {0} of {1}'.format(self.ax.idx,volume.shape[-1])
@@ -149,7 +149,7 @@ class plot:
         self.ax.vol = gridStack
         self.ax.idx = gridStack.shape[-1] // 2
         self.ax.viewer = 'scrollGrid2'
-        self.plot_grid_2d(gridStack[:, :, :, self.ax.idx])
+        self.plot_grid_2d(gridStack[..., self.ax.idx])
         self.fig.canvas.mpl_connect('key_press_event', self._process_key)
 
     def scroll_grid_3d(self, gridStack, skip=None, newFig=True):
@@ -158,7 +158,7 @@ class plot:
         self.ax.vol = gridStack
         self.ax.idx = gridStack.shape[-1] // 2
         self.ax.viewer = 'scrollGrid3'
-        self.plot_grid_3d(gridStack[:, :, :, :, self.ax.idx], skip=skip, newFig=newFig)
+        self.plot_grid_3d(gridStack[..., self.ax.idx], skip=skip, newFig=newFig)
         self.fig.canvas.mpl_connect('key_press_event', self._process_key)
 
     def _process_key(self, event):
@@ -178,21 +178,21 @@ class plot:
         vol = self.ax.vol
         if self.ax.viewer == 'scrollView3':
             self.ax.idx = (self.ax.idx - 1) % vol.shape[-1]
-            self.plotted_image.set_array(vol[:, :, self.ax.idx])
+            self.plotted_image.set_array(vol[..., self.ax.idx])
             self.fig.canvas.draw_idle()
         elif self.ax.viewer == 'scrollView4':
             self.ax.idx = (self.ax.idx - 1) % vol.shape[-2]
-            self.plotted_image.set_array(vol[:,:,self.ax.idx,self.ax.tpnt])
+            self.plotted_image.set_array(vol[..., self.ax.idx, self.ax.tpnt])
             self.fig.canvas.draw_idle()
         elif self.ax.viewer == 'scrollGrid2':
             self.ax.idx = (self.ax.idx - 1) % vol.shape[-1]
             plt.gcf(); plt.cla()
-            self.plot_grid_2d(vol[:, :, :, self.ax.idx])
+            self.plot_grid_2d(vol[..., self.ax.idx])
             self.fig.canvas.draw_idle()
         elif self.ax.viewer == 'scrollGrid3':
             self.ax.idx = (self.ax.idx - 1) % vol.shape[-1]
             plt.gca(); plt.cla()
-            self.plot_grid_3d(vol[:, :, :, :, self.ax.idx])
+            self.plot_grid_3d(vol[..., self.ax.idx])
             self.fig.canvas.draw_idle()
         ttl = 'Position: {0} of {1}'.format(self.ax.idx, vol.shape[-1])
         self.ax.set_xlabel(ttl)
@@ -200,28 +200,28 @@ class plot:
     def _previous_timepoint(self):
         vol = self.ax.vol
         self.ax.tpnt = (self.ax.tpnt - 1) % vol.shape[-1]
-        self.plotted_image.set_array(vol[:,:,self.ax.idx,self.ax.tpnt])
+        self.plotted_image.set_array(vol[..., self.ax.idx, self.ax.tpnt])
         self.fig.canvas.draw_idle()
 
     def _next_slice(self):
         vol = self.ax.vol
         if self.ax.viewer == 'scrollView3':
             self.ax.idx = (self.ax.idx + 1) % vol.shape[-1]
-            self.plotted_image.set_array(vol[:, :, self.ax.idx])
+            self.plotted_image.set_array(vol[..., self.ax.idx])
             self.fig.canvas.draw_idle()
         elif self.ax.viewer == 'scrollView4':
             self.ax.idx = (self.ax.idx + 1) % vol.shape[-2]
-            self.plotted_image.set_array(vol[:, :, self.ax.idx, self.ax.tpnt])
+            self.plotted_image.set_array(vol[..., self.ax.idx, self.ax.tpnt])
             self.fig.canvas.draw_idle()
         elif self.ax.viewer == 'scrollGrid2':
             self.ax.idx = (self.ax.idx + 1) % vol.shape[-1]
             plt.gcf(); plt.cla()
-            self.plot_grid_2d(vol[:, :, :, self.ax.idx])
+            self.plot_grid_2d(vol[..., self.ax.idx])
             self.fig.canvas.draw_idle()
         elif self.ax.viewer == 'scrollGrid3':
             self.ax.idx = (self.ax.idx + 1) % vol.shape[-1]
             plt.gca(); plt.cla()
-            self.plot_grid_3d(vol[:, :, :, :, self.ax.idx])
+            self.plot_grid_3d(vol[..., self.ax.idx])
             self.fig.canvas.draw_idle()
         ttl = 'Position: {0} of {1}'.format(self.ax.idx, vol.shape[-1])
         self.ax.set_xlabel(ttl)
@@ -229,7 +229,7 @@ class plot:
     def _next_timepoint(self):
         vol = self.ax.vol
         self.ax.tpnt = (self.ax.tpnt + 1) % vol.shape[-1]
-        self.plotted_image.set_array(vol[:, :, self.ax.idx, self.ax.tpnt])
+        self.plotted_image.set_array(vol[..., self.ax.idx, self.ax.tpnt])
         self.fig.canvas.draw_idle()
 
     def plot_mip(self, volume, omega=None, permute=None, colormap='gray', colorbar=False, fliptranspose=False):

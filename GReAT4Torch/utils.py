@@ -436,7 +436,10 @@ def save_imagelist(lst, name='image', path='./img/', type='.tiff', scale=False, 
     n = len(lst)
     fll = len(str(n))
     for x in lst:
-        x = x.squeeze().numpy()
+        if torch.is_tensor(x):
+            x = x.squeeze().numpy()
+        else:
+            x = x.squeeze()
         if scale:
             sc = (255.0 / x.max() * (x - x.min())).astype(np.uint8)
         else:
