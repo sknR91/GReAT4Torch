@@ -101,11 +101,35 @@ def prolong_displacements(displacement, new_size):
 
     return torch.stack(prolonged_displacement)
 
-def warp_images_full_size(images, displacement, full_size):
+def warp_images_full_size(images, displacement, full_size, grayscale=True):
     displacement_full = prolong_displacements(displacement, full_size)
-    warped_images_full = warp_images(images, displacement_full)
+
+    if not grayscale:
+        warped_images_full = warp_images_rgb(images, displacement_full)
+    else:
+        warped_images_full = warp_images(images, displacement_full)
 
     return warped_images_full
+
+
+def warp_images_rgb(images, displacement):
+    images_r = [img[:, 0, ...].unsqueeze(1) for img in images]
+    images_g = [img[:, 1, ...].unsqueeze(1) for img in images]
+    images_b = [img[:, 2, ...].unsqueeze(1) for img in images]
+
+    images_r_warped = warp_images(images_r, displacement)
+    images_g_warped = warp_images(images_g, displacement)
+    images_b_warped = warp_images(images_b, displacement)
+
+    warped_images = []
+    for k in range(len(images)):
+        tmp_img = torch.zeros_like(images[k])
+        tmp_img[:, 0, ...] = images_r_warped[k]
+        tmp_img[:, 1, ...] = images_g_warped[k]
+        tmp_img[:, 2, ...] = images_b_warped[k]
+        warped_images.append(tmp_img)
+
+    return warped_images
 
 
 def displacement2grid(displacement):
@@ -432,9 +456,10 @@ def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=Fals
                 if len(image.shape) > 2:
                     image = image[:, :, 0]
             if scale:
-                imagelist.append((image / np.max(image)))
-            elif not grayscale:
-                imagelist.append(image.unsqueeze(0))
+                channel_maxima, _ = torch.max(image.reshape(-1, image.shape[-1]), dim=0)
+                image = image / channel_maxima
+            if not grayscale:
+                imagelist.append(image.permute(2, 0, 1).unsqueeze(0))
             else:
                 imagelist.append(image.unsqueeze(0).unsqueeze(0))
 
