@@ -335,12 +335,18 @@ def image_list2stack_numpy(image_list):
 
 
 def image_list2numpy(image_list):
-    image_size = np.array(image_list[0].size()[2:])
+    if image_list[0].size()[1] > 1:
+        image_size = np.array(image_list[0].size()[1:])
+    else:
+        image_size = np.array(image_list[0].size()[2:])
     num_images = len(image_list)
 
     images = np.zeros(np.append(image_size, num_images))
     for k in range(num_images):
         images[..., k] = image_list[k].squeeze()
+
+    if image_list[0].size()[1] > 1:
+        images = images.transpose((1, 2, 0, 3))
 
     return images
 
@@ -434,7 +440,14 @@ def save_imagelist(lst, name='image', path='./img/', type='.tiff', scale=False, 
         if scale:
             sc = (255.0 / x.max() * (x - x.min())).astype(np.uint8)
         else:
-            sc = x.astype(np.uint8)
+            if np.max(x.flatten()) > 1:
+                sc = x.astype(np.uint8)
+            elif np.max(x.flatten()) <= 1:
+                sc = 255 * x
+                sc = sc.astype(np.uint8)
+
+        if len(lst[0].size()) > 2:
+            sc = sc.transpose((1, 2, 0))
         im = Image.fromarray(sc)
         if convert:
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
@@ -442,8 +455,8 @@ def save_imagelist(lst, name='image', path='./img/', type='.tiff', scale=False, 
         k += 1
 
 
-def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=False, dtype=torch.float32,
-                   device=torch.device('cpu')):
+def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=False, scale_channel_wise=False,
+                   dtype=torch.float32, device=torch.device('cpu')):
     # skipping subdirectories!
     files = sorted([f for f in os.listdir(path) if f.lower().endswith(type) and os.path.isfile(os.path.join(path, f))])
 
@@ -456,8 +469,11 @@ def read_imagelist(path='./', size=None, grayscale=True, type='.png', scale=Fals
                 if len(image.shape) > 2:
                     image = image[:, :, 0]
             if scale:
-                channel_maxima, _ = torch.max(image.reshape(-1, image.shape[-1]), dim=0)
-                image = image / channel_maxima
+                if scale_channel_wise:
+                    channel_maxima, _ = torch.max(image.reshape(-1, image.shape[-1]), dim=0)
+                    image = image / channel_maxima
+                else:
+                    image = image / torch.max(image.flatten())
             if not grayscale:
                 imagelist.append(image.permute(2, 0, 1).unsqueeze(0))
             else:
